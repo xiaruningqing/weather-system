@@ -1,0 +1,39 @@
+{
+  "name": "tianqi-new",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "framer-motion": "^11.0.0",
+    "lottie-react": "^2.4.0",
+    "three": "^0.160.0",
+    "jspdf": "^2.5.1",
+    "html2canvas": "^1.4.1",
+    "@react-three/fiber": "^8.15.13",
+    "@react-three/drei": "^9.103.0",
+    "postprocessing": "^6.35.3",
+    "@react-three/postprocessing": "^2.16.3",
+    "satellite.js": "^4.0.0",
+    "echarts": "^5.5.0",
+    "echarts-for-react": "^3.0.2",
+    "lucide-react": "^0.456.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.19",
+    "react-router-dom": "^6.23.1",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.7",
+    "vite": "^5.2.0"
+  }
+}
+
+
+
