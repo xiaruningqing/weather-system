@@ -146,6 +146,7 @@ export default function WeatherCompare({
             onQuery={(q)=>{ setLocation((prev)=>({ ...prev, ...q })); setTimeout(()=> pull(), 0) }}
             loading={loading}
             cities={cityList}
+            onCityChange={onCityChange}
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
             <RealTimeWeatherCard data={real} />
@@ -163,7 +164,7 @@ export default function WeatherCompare({
   )
 }
 
-function Header({ location, onQuery, loading, cities=[] }) {
+function Header({ location, onQuery, loading, cities=[], onCityChange }) {
   const [city, setCity] = useState(location.city || cities[0] || '')
   const locate = () => navigator.geolocation?.getCurrentPosition((pos) => {
     onQuery({ lat: pos.coords.latitude, lon: pos.coords.longitude, city: undefined })

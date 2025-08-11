@@ -81,7 +81,7 @@ export default function EarthPage() {
           <h2 className="text-xl font-semibold mb-2">实时天气对比（高德地图 数据源示例）</h2>
           <WeatherCompare
             provider="amap"
-            apiKey="fef7c61a28adaa2d040029ce6107cf8d"
+            apiKey={import.meta.env.VITE_AMAP_KEY || 'fef7c61a28adaa2d040029ce6107cf8d'}
             amapConfig={{}}
             predictionApiUrl={null}
             videoBackground
@@ -91,7 +91,7 @@ export default function EarthPage() {
             onCityChange={async (cityName) => {
               try {
                 if (!cityName) return
-                const geo = await geocodeAMapCity(cityName, 'fef7c61a28adaa2d040029ce6107cf8d')
+                const geo = await geocodeAMapCity(cityName, import.meta.env.VITE_AMAP_KEY || 'fef7c61a28adaa2d040029ce6107cf8d')
                 setFocusCity({ name: cityName, lat: geo.lat, lon: geo.lon })
               } catch {}
             }}
