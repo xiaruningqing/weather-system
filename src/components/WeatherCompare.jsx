@@ -39,23 +39,37 @@ export default function WeatherCompare({
   const [isMockPred, setIsMockPred] = useState(false)
 
   const fetchReal = useCallback(async () => {
+    setError('')
+    const tryOpenMeteo = async () => {
+      try { return await fetchRealOpenMeteo({ city: location.city, lat: location.lat, lon: location.lon }) } catch (e) { return null }
+    }
     try {
-      setError('')
       if (provider === 'cma') {
         const cfg = cmaConfig || {}
         if (!cfg.id || !cfg.key || !cfg.sheng || !cfg.place) throw new Error('CMA 需提供 id/key/sheng/place')
         return await fetchRealCMA(cfg)
       } else if (provider === 'amap') {
         const cfg = amapConfig || {}
-        return await fetchRealAMap({ city: cfg.city || location.city, adcode: cfg.adcode, lat: location.lat, lon: location.lon, apiKey })
+        try {
+          return await fetchRealAMap({ city: cfg.city || location.city, adcode: cfg.adcode, lat: location.lat, lon: location.lon, apiKey })
+        } catch (e) {
+          // AMap 失败时兜底 Open‑Meteo，避免课堂中断
+          const fallback = await tryOpenMeteo()
+          if (fallback) return fallback
+          throw e
+        }
       }
-      // 首选 OWM（有 key），否则回退 Open‑Meteo（无需 key）
-      if (apiKey) return await fetchRealOWM({ city: location.city, lat: location.lat, lon: location.lon, apiKey })
-      return await fetchRealOpenMeteo({ city: location.city, lat: location.lat, lon: location.lon })
+      // OWM 优先；无 key 或失败则回退 Open‑Meteo
+      try {
+        if (apiKey) return await fetchRealOWM({ city: location.city, lat: location.lat, lon: location.lon, apiKey })
+      } catch {}
+      const fm = await tryOpenMeteo()
+      if (fm) return fm
+      throw new Error('实时数据获取失败')
     } catch (e) {
       setError(e.message || '请求失败'); return null
     }
-  }, [apiKey, location, provider, cmaConfig])
+  }, [apiKey, location, provider, cmaConfig, amapConfig])
 
   const fetchPred = useCallback(async () => {
     try {
@@ -138,7 +152,8 @@ export default function WeatherCompare({
 
   return (
     <div className="relative glass p-4 overflow-hidden">
-      {videoBackground && <VideoBg weather={real?.weather_description} />}
+      {/* 部署环境若阻断视频外链，自动关闭背景视频 */}
+      {videoBackground && !!real?.weather_description && <VideoBg weather={real?.weather_description} />}
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1">
           <Header
