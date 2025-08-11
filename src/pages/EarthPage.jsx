@@ -33,6 +33,8 @@ function centerFromKey(key){
 export default function EarthPage() {
   const [cfg, setCfg] = useState({ showClouds: true, showSatellites: true, showStations: true, showLinks: true, timeScale: 60, postprocessing: true, isPlaying: true, centerKey: 'xa' })
   const [focusCity, setFocusCity] = useState(null)
+  const EARTH_TEX_MAP = import.meta.env.VITE_EARTH_TEX_MAP || 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'
+  const EARTH_TEX_CLOUDS = import.meta.env.VITE_EARTH_TEX_CLOUDS || 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_clouds_2048.png'
   return (
     <div className="min-h-screen">
       <header className="container mx-auto px-6 py-6">
@@ -61,7 +63,7 @@ export default function EarthPage() {
         />
         <div className="glass p-4">
           <Earth3D
-            earthTextures={{ map: 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg', clouds: 'https://threejs.org/examples/textures/planets/earth_clouds_2048.png' }}
+            earthTextures={{ map: EARTH_TEX_MAP, clouds: EARTH_TEX_CLOUDS }}
             satellites={demoSatellites}
             stations={demoStations}
             dataCenter={centerFromKey(cfg.centerKey)}

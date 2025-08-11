@@ -45,13 +45,19 @@ export default function WeatherCompare({
     }
     try {
       if (provider === 'cma') {
-        const cfg = cmaConfig || {}
+        const cfg = {
+          id: import.meta.env.VITE_CMA_ID || cmaConfig?.id,
+          key: import.meta.env.VITE_CMA_KEY || cmaConfig?.key,
+          sheng: import.meta.env.VITE_CMA_SHENG || cmaConfig?.sheng,
+          place: import.meta.env.VITE_CMA_PLACE || cmaConfig?.place,
+        }
         if (!cfg.id || !cfg.key || !cfg.sheng || !cfg.place) throw new Error('CMA 需提供 id/key/sheng/place')
         return await fetchRealCMA(cfg)
       } else if (provider === 'amap') {
         const cfg = amapConfig || {}
         try {
-          return await fetchRealAMap({ city: cfg.city || location.city, adcode: cfg.adcode, lat: location.lat, lon: location.lon, apiKey })
+          const amapKey = import.meta.env.VITE_AMAP_KEY || apiKey
+          return await fetchRealAMap({ city: cfg.city || location.city, adcode: cfg.adcode, lat: location.lat, lon: location.lon, apiKey: amapKey })
         } catch (e) {
           // AMap 失败时兜底 Open‑Meteo，避免课堂中断
           const fallback = await tryOpenMeteo()
