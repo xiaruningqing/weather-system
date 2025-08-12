@@ -15,7 +15,7 @@ import PDFSummaryButton from './components/PDFSummaryButton.jsx'
 export default function App() {
   const [currentStage, setCurrentStage] = useState(1)
   const [isPaused, setIsPaused] = useState(false)
-  const [isAutoPlay, setIsAutoPlay] = useState(true)
+  const [isAutoPlay, setIsAutoPlay] = useState(false)
   const [speedFactor, setSpeedFactor] = useState(1)
   const [showParticles, setShowParticles] = useState(true)
 
