@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import * as THREE from 'three'
-import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber'
+import { OrbitControls, useTexture } from '@react-three/drei'
+import { FaSatellite, FaShip } from 'react-icons/fa'
+import { MdHome, MdRadar } from 'react-icons/md'
 import { useGlobal } from '../store/global.jsx'
 import { Info } from 'lucide-react'
+import UISensorCard from './ui/SensorCard.jsx'
 
 const WIND_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 
@@ -26,6 +29,10 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
   const [openKey, setOpenKey] = useState(null)
   const [score, setScore] = useState(0)
   const [markers, setMarkers] = useState([]) // {x,y,key,id,done}
+  const [dragOrigin, setDragOrigin] = useState(null) // {x,y} from sensor card
+  const [hoverWorld, setHoverWorld] = useState(null) // {x,y,z}
+  const [isDragging, setIsDragging] = useState(false)
+  const [highlightKey, setHighlightKey] = useState(null)
   const hasCompletedRef = useRef(false)
   const allDone = useAllDone(devicesState)
 
@@ -67,13 +74,16 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
   }
 
   const progress = useMemo(() => Object.values(devicesState).filter((d) => d.status === 'done').length, [devicesState])
+  useEffect(() => {
+    if (openKey && devicesState[openKey]?.status === 'done') setHighlightKey(openKey)
+  }, [openKey, devicesState])
 
   return (
     <section className="min-h-[520px]">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl md:text-2xl font-semibold">阶段一 · 多源感知</h2>
-          <p className="mt-1 text-slate-300">将右侧传感器拖到左侧地球，完成采集；再次点击卡片可查看采集数据</p>
+          <p className="mt-1 text-slate-300">右侧拖拽传感器到左侧地球采集数据，点击地球上的图标卡片查看数据</p>
         </div>
         <div className="text-sm text-slate-300 flex items-center gap-3">
           <span>进度</span>
@@ -96,38 +106,130 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* 左：three.js 地球投放区 */}
         <div className="lg:col-span-3">
-          <StageOneGlobe markers={markers} onDropDevice={(key, world) => {
+          <StageOneGlobe dragOrigin={dragOrigin} markers={markers} hoverWorld={isDragging ? hoverWorld : null} highlightKey={highlightKey} devicesState={devicesState} onDropDevice={(key, world) => {
             const x = 50 + (world.x || 0) * 30
             const y = 50 - (world.y || 0) * 30
             startCollectAt(key, x, y)
-          }} />
+            setHoverWorld(null)
+            setIsDragging(false)
+          }} onHoverDevice={(world) => setHoverWorld(world)} />
         </div>
 
         {/* 右：传感器面板（两列 + 自定义图标 + 查看数据） */}
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-            <div className="text-sky-300 font-semibold mb-3">多源感知</div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sky-300 font-semibold">多源感知</span>
+              <div className="text-xs text-slate-400">
+                当前打开: {openKey || '无'} | 
+                <button 
+                  onClick={() => setOpenKey('satellite')} 
+                  className="ml-1 text-blue-400 hover:text-blue-300"
+                >
+                  测试卫星
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <SensorCard icon={SensorIcon} iconType="satellite" title="卫星" k="satellite" state={devicesState.satellite} openKey={openKey} setOpenKey={setOpenKey} />
-              <SensorCard icon={SensorIcon} iconType="ground" title="地面站" k="ground" state={devicesState.ground} openKey={openKey} setOpenKey={setOpenKey} />
-              <SensorCard icon={SensorIcon} iconType="radar" title="雷达" k="radar" state={devicesState.radar} openKey={openKey} setOpenKey={setOpenKey} />
-              <SensorCard icon={SensorIcon} iconType="buoy" title="浮标" k="buoy" state={devicesState.buoy} openKey={openKey} setOpenKey={setOpenKey} />
+              <div 
+                draggable={devicesState.satellite.status==='idle'} 
+                onDragStart={(e)=>{
+                  if(devicesState.satellite.status !== 'idle') {
+                    e.preventDefault();
+                    return false;
+                  }
+                  const r=e.currentTarget.getBoundingClientRect(); 
+                  setDragOrigin({x:r.left+r.width/2,y:r.top+r.height/2}); 
+                  e.dataTransfer.setData('text/plain','satellite'); 
+                  setIsDragging(true)
+                }} 
+                onDragEnd={()=>setIsDragging(false)}
+              >
+                <UISensorCard id="satellite" type="satellite" title="卫星" status={devicesState.satellite.status==='idle'?'idle':devicesState.satellite.status} desc={devicesState.satellite.status==='done'?'已完成，点击查看数据':devicesState.satellite.status==='collecting'?'采集中…':'拖到地球开始采集'} onClick={(id)=>{console.log('Clicked sensor:', id, 'current openKey:', openKey); setOpenKey(openKey===id?null:id)}} onStatusClick={(id)=>{console.log('Status clicked:', id); setOpenKey(openKey===id?null:id)}} />
+              </div>
+              <div draggable={devicesState.ground.status==='idle'} onDragStart={(e)=>{const r=e.currentTarget.getBoundingClientRect(); setDragOrigin({x:r.left+r.width/2,y:r.top+r.height/2}); e.dataTransfer.setData('text/plain','ground'); setIsDragging(true)}} onDragEnd={()=>setIsDragging(false)}>
+                <UISensorCard id="ground" type="ground" title="地面站" status={devicesState.ground.status==='idle'?'idle':devicesState.ground.status} desc={devicesState.ground.status==='done'?'已完成，点击查看数据':devicesState.ground.status==='collecting'?'采集中…':'拖到地球开始采集'} onClick={(id)=>setOpenKey(openKey===id?null:id)} onStatusClick={(id)=>setOpenKey(openKey===id?null:id)} />
+              </div>
+              <div draggable={devicesState.radar.status==='idle'} onDragStart={(e)=>{const r=e.currentTarget.getBoundingClientRect(); setDragOrigin({x:r.left+r.width/2,y:r.top+r.height/2}); e.dataTransfer.setData('text/plain','radar'); setIsDragging(true)}} onDragEnd={()=>setIsDragging(false)}>
+                <UISensorCard id="radar" type="radar" title="雷达" status={devicesState.radar.status==='idle'?'idle':devicesState.radar.status} desc={devicesState.radar.status==='done'?'已完成，点击查看数据':devicesState.radar.status==='collecting'?'采集中…':'拖到地球开始采集'} onClick={(id)=>setOpenKey(openKey===id?null:id)} onStatusClick={(id)=>setOpenKey(openKey===id?null:id)} />
+              </div>
+              <div draggable={devicesState.buoy.status==='idle'} onDragStart={(e)=>{const r=e.currentTarget.getBoundingClientRect(); setDragOrigin({x:r.left+r.width/2,y:r.top+r.height/2}); e.dataTransfer.setData('text/plain','buoy'); setIsDragging(true)}} onDragEnd={()=>setIsDragging(false)}>
+                <UISensorCard id="buoy" type="buoy" title="浮标" status={devicesState.buoy.status==='idle'?'idle':devicesState.buoy.status} desc={devicesState.buoy.status==='done'?'已完成，点击查看数据':devicesState.buoy.status==='collecting'?'采集中…':'拖到地球开始采集'} onClick={(id)=>setOpenKey(openKey===id?null:id)} onStatusClick={(id)=>setOpenKey(openKey===id?null:id)} />
+              </div>
             </div>
             <div className="mt-4 space-y-2">
               <DataBlock title="温度" value={mergeMetric(devicesState, 'temperatureC', (v)=>`${v}°C`)} />
               <DataBlock title="湿度" value={mergeMetric(devicesState, 'humidityPct', (v)=>`${v}%`)} />
-              <DataBlock title="气压" value={mergeMetric(devicesState, 'pressureHpa', (v)=>`${v} hPa`)} />
+              <DataBlock title="气压" value={mergeMetric(devicesState, 'pressureHpa', (v)=>`${v}hPa`)} />
               <DataBlock title="能见度" value={mergeMetric(devicesState, 'visibilityKm', (v)=>`${v||3.2}km`, true)} />
-              <DataBlock title="降水" value={mergeMetric(devicesState, 'rainMm', (v)=>`${v||0}mm`, true)} />
+              <DataBlock title="降水" value={mergeMetric(devicesState, 'rainMm', (v)=>`${v||4.1}mm`, true)} />
+            </div>
+            <div className="mt-4">
+              <div className="text-xs text-slate-400 mb-2">雷达传输速度：x1.0</div>
+              <div className="w-full bg-slate-700 rounded-full h-2">
+                <div className="bg-amber-400 h-2 rounded-full transition-all duration-300" style={{ width: `${Math.min(100, (progress/4)*100 + 20)}%` }}></div>
+              </div>
             </div>
             <div className="text-xs text-slate-400 flex items-center gap-2 pt-2">
               <Info size={14} />
-              <span>拖拽到左侧地球任意位置开始采集；绿色“完成”为已采集</span>
+              <span>拖拽到左侧地球任意位置开始采集；绿色"完成"为已采集</span>
             </div>
             {!isAutoPlay && allDone && (
               <button type="button" className="mt-3 w-full px-4 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary" onClick={() => onComplete?.()}>进入阶段二</button>
             )}
           </div>
+          
+          {/* 详细数据显示区域 */}
+          {openKey && devicesState[openKey]?.status === 'done' && (() => {
+            console.log('Showing data for:', openKey, 'data:', devicesState[openKey]?.data);
+            return true;
+          })() && (
+            <div className="mt-4 rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${openKey === 'satellite' ? 'bg-blue-500/20' : openKey === 'ground' ? 'bg-green-500/20' : openKey === 'radar' ? 'bg-orange-500/20' : 'bg-purple-500/20'}`}>
+                    {(() => {
+                      const icons = {
+                        satellite: <FaSatellite className="text-blue-400" size={16} />,
+                        ground: <MdHome className="text-green-400" size={16} />,
+                        radar: <MdRadar className="text-orange-400" size={16} />,
+                        buoy: <FaShip className="text-purple-400" size={16} />
+                      }
+                      return icons[openKey]
+                    })()}
+                  </div>
+                  <span className="text-sky-300 font-semibold">
+                    {openKey === 'satellite' ? '卫星' : openKey === 'ground' ? '地面站' : openKey === 'radar' ? '雷达' : '浮标'}数据详情
+                  </span>
+                </div>
+                <button 
+                  onClick={() => setOpenKey(null)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <DetailDataItem label="温度" value={`${devicesState[openKey].data?.temperatureC || '--'}°C`} icon="🌡️" />
+                <DetailDataItem label="湿度" value={`${devicesState[openKey].data?.humidityPct || '--'}%`} icon="💧" />
+                <DetailDataItem label="气压" value={`${devicesState[openKey].data?.pressureHpa || '--'}hPa`} icon="📊" />
+                <DetailDataItem label="风速" value={`${devicesState[openKey].data?.windSpeed || '--'}m/s`} icon="🌪️" />
+                <DetailDataItem label="风向" value={devicesState[openKey].data?.windDir || '--'} icon="🧭" />
+                <DetailDataItem label="云量" value={`${devicesState[openKey].data?.cloudPct || '--'}%`} icon="☁️" />
+              </div>
+              
+              <div className="mt-3 p-3 bg-slate-700/30 rounded-lg">
+                <div className="text-xs text-slate-400 mb-1">数据质量</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-slate-600 rounded-full h-2">
+                    <div className="bg-green-400 h-2 rounded-full transition-all duration-500" style={{ width: '87%' }}></div>
+                  </div>
+                  <span className="text-xs text-green-400 font-medium">87%</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -152,7 +254,7 @@ function GlobeDropArea({ markers, onDropDevice, isPaused }) {
       }}
     >
       {/* 背景星空 */}
-      <Stars />
+      <DotsStars />
       {/* 地球本体（SVG 画圆 + 渐变，高光与暗侧） */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative w-[90%] max-w-[560px] aspect-square">
@@ -177,7 +279,7 @@ function GlobeDropArea({ markers, onDropDevice, isPaused }) {
   )
 }
 
-function Stars() {
+function DotsStars() {
   const dots = useMemo(() => new Array(80).fill(0).map(() => ({ x: Math.random()*100, y: Math.random()*100, a: 0.4 + Math.random()*0.6 })), [])
   return (
     <div className="absolute inset-0">
@@ -197,7 +299,7 @@ function DropMarker({ x, y, done }) {
   )
 }
 
-function SensorCard({ icon: Icon, iconType, title, k, state, openKey, setOpenKey }) {
+function SensorCard({ iconType, title, k, state, openKey, setOpenKey, setDragOrigin, setIsDragging }) {
   const isDone = state.status === 'done'
   const isCollecting = state.status === 'collecting'
   const opened = openKey === k
@@ -205,12 +307,18 @@ function SensorCard({ icon: Icon, iconType, title, k, state, openKey, setOpenKey
     <div
       className={`rounded-xl border p-4 bg-slate-800/40 ${isDone ? 'border-emerald-500/40' : isCollecting ? 'border-primary/50 shadow-glow' : 'border-slate-700/60 hover:border-primary/40'}`}
       draggable={state.status === 'idle'}
-      onDragStart={(e) => { e.dataTransfer.setData('text/plain', k) }}
+      onDragStart={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        setDragOrigin?.({ x: rect.left + rect.width/2, y: rect.top + rect.height/2 })
+        e.dataTransfer.setData('text/plain', k)
+        setIsDragging?.(true)
+      }}
+      onDragEnd={() => setIsDragging?.(false)}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sky-300">
-          <motion.span animate={{ rotate: isCollecting ? (iconType==='radar'?360:0) : 0 }} transition={{ repeat: isCollecting && iconType==='radar' ? Infinity : 0, ease: 'linear', duration: 1.8 }}>
-            <Icon type={iconType} />
+          <motion.span animate={{ rotate: isCollecting && iconType==='radar' ? 360 : 0 }} transition={{ repeat: isCollecting && iconType==='radar' ? Infinity : 0, ease: 'linear', duration: 1.6 }}>
+            <SensorIconBox type={iconType} size={26} />
           </motion.span>
           <span className="font-semibold">{title}</span>
         </div>
@@ -219,9 +327,10 @@ function SensorCard({ icon: Icon, iconType, title, k, state, openKey, setOpenKey
       <div className="mt-2 text-xs text-slate-400">
         {state.status === 'idle' && '拖到地球开始采集'}
         {state.status === 'collecting' && '采集中…'}
-        {isDone && (
-          <button className="text-primary ml-1 underline underline-offset-2" onClick={() => setOpenKey(opened ? null : k)}>查看数据</button>
-        )}
+        {isDone && (<>
+          已完成，
+          <button className="text-primary underline underline-offset-2" onClick={() => setOpenKey(opened ? null : k)}>点击查看数据</button>
+        </>)}
       </div>
       {opened && isDone && state.data && (
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-300">
@@ -238,98 +347,723 @@ function SensorCard({ icon: Icon, iconType, title, k, state, openKey, setOpenKey
   )
 }
 
-// ===== 3D 地球（按截图风格，蓝色科幻质感 + 夜昼分界 + 大气辉光） =====
-function StageOneGlobe({ markers, onDropDevice }) {
+// ===== 详细数据项组件 =====
+function DetailDataItem({ label, value, icon }) {
   return (
-    <div className="relative h-[420px] md:h-[520px] rounded-xl overflow-hidden border border-slate-700/60 bg-black">
-      <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 2.2], fov: 45 }} onCreated={({ gl }) => { gl.setClearColor('#020617') }}>
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 3, 5]} intensity={1.2} />
-        <Atmosphere />
-        <EarthCore />
-        <Markers3D markers={markers} />
-        <Controls3D onDropDevice={onDropDevice} />
-      </Canvas>
-      <div className="absolute left-3 top-3 text-xs text-slate-300 bg-slate-800/60 rounded px-2 py-1 border border-slate-700/60">将右侧传感器拖到地球</div>
-      <LegendHint />
+    <div className="bg-slate-700/20 rounded-lg p-3 border border-slate-600/30">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-lg">{icon}</span>
+        <span className="text-xs text-slate-400">{label}</span>
+      </div>
+      <div className="text-lg font-semibold text-white">{value}</div>
     </div>
   )
 }
 
-function EarthCore() {
-  const textureUrl = import.meta.env.VITE_EARTH_TEX_MAP || 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/land_ocean_ice_cloud_2048.jpg'
-  const tex = useMemo(() => new THREE.TextureLoader().load(textureUrl), [textureUrl])
+// ===== 3D 地球（按截图风格，蓝色科幻质感 + 夜昼分界 + 大气辉光） =====
+function StageOneGlobe({ markers, onDropDevice, onHoverDevice, dragOrigin, hoverWorld, highlightKey, devicesState }) {
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [isPaused, setIsPaused] = useState(false)
+  const containerRef = useRef(null)
+  const [rotation, setRotation] = useState(0)
+  const [dragPreview, setDragPreview] = useState({ visible: false, position: null, sensorType: null })
+  
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!isPaused) {
+        setCurrentTime(new Date())
+        setRotation(prev => (prev + 0.2) % 360)
+      }
+    }, 100)
+    return () => clearInterval(timer)
+  }, [isPaused])
+
+  const formatTime = (date) => {
+    return `北京时间 ${date.getFullYear()}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}:${date.getSeconds().toString().padStart(2,'0')}`
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    const key = e.dataTransfer.getData('text/plain')
+    if (!key || !containerRef.current) return
+    
+    const rect = containerRef.current.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    
+    // 检查是否在地球圆形区域内
+    const dx = x - centerX
+    const dy = y - centerY
+    const earthRadius = Math.min(centerX, centerY) * 0.8
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    
+    if (distance <= earthRadius) {
+      // 转换为世界坐标
+      const worldX = (dx / earthRadius)
+      const worldY = -(dy / earthRadius)
+      const worldZ = Math.sqrt(Math.max(0, 1 - worldX * worldX - worldY * worldY))
+      onDropDevice?.(key, { x: worldX, y: worldY, z: worldZ })
+    }
+  }
+
   return (
-    <mesh>
-      <sphereGeometry args={[1, 64, 64]} />
-      <meshPhongMaterial map={tex} shininess={8} specular={new THREE.Color('#1e293b')} />
-    </mesh>
+    <div 
+      ref={containerRef}
+      className="relative h-[420px] md:h-[520px] rounded-xl overflow-hidden border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleDrop}
+    >
+      {/* 星空背景 */}
+      <DotsStars />
+      
+      {/* 3D地球 */}
+      <Canvas 
+        dpr={[1, 2]} 
+        camera={{ position: [0, 0, 2.5], fov: 45 }} 
+        onCreated={({ gl }) => {
+          gl.setClearColor('#020617')
+          gl.outputColorSpace = THREE.SRGBColorSpace
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          gl.toneMappingExposure = 1.2
+        }}
+      >
+        {/* 环境光 - 确保地球整体可见 */}
+        <ambientLight intensity={0.6} color={'#ffffff'} />
+        
+        {/* 主光源 - 模拟太阳光 */}
+        <directionalLight 
+          position={[5, 3, 5]} 
+          intensity={1.8} 
+          color={'#ffffff'}
+          castShadow={false}
+        />
+        
+        {/* 辅助光源 - 增强细节 */}
+        <directionalLight 
+          position={[-3, -2, 2]} 
+          intensity={0.4} 
+          color={'#e3f2fd'}
+        />
+        
+        <Earth3DCore isPaused={isPaused} markers={markers} />
+        <EarthControls onDropDevice={onDropDevice} containerRef={containerRef} setDragPreview={setDragPreview} />
+        <TextureStatus />
+      </Canvas>
+      
+      {/* 2D传感器标记层 */}
+      <div className="absolute inset-0 pointer-events-none">
+        <Markers2D markers={markers} devicesState={devicesState} />
+      </div>
+      
+      {/* 2D拖拽预览层 */}
+      <DragPreview2D 
+        position={dragPreview.position}
+        visible={dragPreview.visible}
+        sensorType={dragPreview.sensorType}
+        containerRef={containerRef}
+      />
+      
+      {/* 暂停控制 */}
+      <div className="absolute left-3 top-3 pointer-events-auto">
+        <button 
+          onClick={() => setIsPaused(!isPaused)}
+          className="px-3 py-1 text-xs bg-slate-800/80 border border-slate-600/60 rounded text-slate-200 hover:bg-slate-700/80 pointer-events-auto"
+        >
+          {isPaused ? '播放' : '暂停'}
+        </button>
+      </div>
+      
+      {/* 时间显示 */}
+      <div className="absolute right-3 top-3 text-xs text-slate-300 bg-slate-800/80 rounded px-2 py-1 border border-slate-700/60">
+        {formatTime(currentTime)}
+      </div>
+      
+      {/* 获取状态提示 */}
+      <div className="absolute left-3 bottom-3 text-xs text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded px-2 py-1">
+        图例：蓝色采集中 绿色：完成
+      </div>
+      
+
+      
+      {/* 将右侧传感器到地球提示 */}
+      <div className="absolute bottom-3 right-3 text-xs text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded px-2 py-1">
+        将右侧传感器拖到地球开始采集
+      </div>
+    </div>
   )
 }
 
-function Atmosphere() {
-  return (
-    <mesh>
-      <sphereGeometry args={[1.03, 64, 64]} />
-      <meshBasicMaterial color={'#38bdf8'} transparent opacity={0.08} side={THREE.BackSide} />
-    </mesh>
-  )
+// ===== 强制纹理加载 Hook =====
+function useSafeTexture(url, fallbackColor = '#1e3a8a') {
+  const [texture, setTexture] = useState(null)
+  const [fallback, setFallback] = useState(false)
+  const [loading, setLoading] = useState(false)
+  
+  useEffect(() => {
+    if (!url) {
+      setFallback(true)
+      return
+    }
+    
+    setLoading(true)
+    const loader = new THREE.TextureLoader()
+    
+    // 创建跨域代理URL或使用本地备份
+    const proxyUrl = url.includes('threejs.org') ? url : `https://cors-anywhere.herokuapp.com/${url}`
+    
+    // 尝试多个加载方案
+    const loadTexture = (urls) => {
+      const tryLoad = (urlIndex) => {
+        if (urlIndex >= urls.length) {
+          console.warn('All texture URLs failed, using fallback')
+          setFallback(true)
+          setLoading(false)
+          return
+        }
+        
+        loader.load(
+          urls[urlIndex],
+          (loadedTexture) => {
+            console.log('Texture loaded successfully:', urls[urlIndex])
+            loadedTexture.wrapS = THREE.RepeatWrapping
+            loadedTexture.wrapT = THREE.RepeatWrapping
+            setTexture(loadedTexture)
+            setFallback(false)
+            setLoading(false)
+          },
+          (progress) => {
+            console.log('Loading progress:', progress)
+          },
+          (error) => {
+            console.warn(`Texture loading failed for ${urls[urlIndex]}:`, error)
+            tryLoad(urlIndex + 1)
+          }
+        )
+      }
+      tryLoad(0)
+    }
+    
+    // 多个备用URL
+    const fallbackUrls = [
+      url,
+      `https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg`,
+      `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#4a90e2"/><circle cx="128" cy="128" r="100" fill="#2e7d32"/></svg>')}`
+    ]
+    
+    loadTexture(fallbackUrls)
+  }, [url])
+  
+  return { texture, fallback, loading, fallbackColor }
 }
 
-function Markers3D({ markers }) {
+// ===== 3D 地球核心组件 =====
+function Earth3DCore({ isPaused, markers = [] }) {
+  const earthRef = useRef()
+  const cloudsRef = useRef()
+  
+  // 使用更可靠的地球纹理源
+  const earthTexUrl = 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg'
+  const normalTexUrl = 'https://threejs.org/examples/textures/planets/earth_normal_2048.jpg'
+  const specularTexUrl = 'https://threejs.org/examples/textures/planets/earth_specular_2048.jpg'
+  const cloudsTexUrl = 'https://threejs.org/examples/textures/planets/earth_clouds_1024.png'
+  
+  const { texture: earthMap, fallback: earthFallback, loading: earthLoading } = useSafeTexture(earthTexUrl)
+  const { texture: normalMap } = useSafeTexture(normalTexUrl)
+  const { texture: specularMap } = useSafeTexture(specularTexUrl)
+  const { texture: cloudsMap } = useSafeTexture(cloudsTexUrl)
+  
+  // 纹理状态显示
+  const textureStatus = useMemo(() => {
+    if (earthLoading) return '加载中...'
+    if (earthFallback) return '程序化纹理'
+    if (earthMap) return '高清纹理'
+    return '基础纹理'
+  }, [earthLoading, earthFallback, earthMap])
+  
+  // 创建程序化地球纹理
+  const proceduralEarthTexture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    
+    // 绘制海洋背景
+    ctx.fillStyle = '#1976d2'
+    ctx.fillRect(0, 0, 512, 256)
+    
+    // 绘制大陆形状 (简化的世界地图)
+    ctx.fillStyle = '#388e3c'
+    
+    // 非洲和欧洲
+    ctx.beginPath()
+    ctx.ellipse(280, 100, 40, 60, 0, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // 亚洲
+    ctx.beginPath() 
+    ctx.ellipse(380, 80, 60, 40, 0, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // 北美洲
+    ctx.beginPath()
+    ctx.ellipse(120, 70, 45, 50, 0, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // 南美洲
+    ctx.beginPath()
+    ctx.ellipse(140, 170, 25, 55, 0, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // 澳大利亚
+    ctx.beginPath()
+    ctx.ellipse(420, 180, 30, 20, 0, 0, Math.PI * 2)
+    ctx.fill()
+    
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    return texture
+  }, [])
+
+  // 地球材质 - 根据纹理加载状态动态调整
+  const earthMaterial = useMemo(() => {
+    if (earthFallback || !earthMap) {
+      // 使用程序化纹理确保真实地球外观
+      return new THREE.MeshPhongMaterial({
+        map: proceduralEarthTexture,
+        shininess: 50,
+        specular: new THREE.Color('#1976d2')
+      })
+    } else {
+      // 完整纹理材质
+      return new THREE.MeshPhongMaterial({
+        map: earthMap,
+        normalMap: normalMap,
+        specularMap: specularMap,
+        shininess: 100,
+        specular: new THREE.Color('#ffffff')
+      })
+    }
+  }, [earthMap, normalMap, specularMap, earthFallback, proceduralEarthTexture])
+  
+  // 云层材质
+  const cloudsMaterial = useMemo(() => {
+    if (!cloudsMap) {
+      return new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.1
+      })
+    }
+    return new THREE.MeshBasicMaterial({
+      map: cloudsMap,
+      transparent: true,
+      opacity: 0.4
+    })
+  }, [cloudsMap])
+  
+  useFrame((_, delta) => {
+    if (!isPaused) {
+      if (earthRef.current) {
+        earthRef.current.rotation.y += delta * 0.05
+      }
+      if (cloudsRef.current) {
+        cloudsRef.current.rotation.y += delta * 0.08
+      }
+    }
+  })
+  
   return (
     <group>
-      {markers.map((m) => (
-        <mesh key={m.id} position={[ (m.x-50)/30, -(m.y-50)/30, 1.01 ]}>
-          <sphereGeometry args={[0.02, 16, 16]} />
-          <meshBasicMaterial color={m.done ? '#34d399' : '#38bdf8'} />
-        </mesh>
-      ))}
+      {/* 地球主体 */}
+      <mesh ref={earthRef}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <primitive object={earthMaterial} attach="material" />
+      </mesh>
+      
+      {/* 云层 */}
+      <mesh ref={cloudsRef} scale={1.003}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <primitive object={cloudsMaterial} attach="material" />
+      </mesh>
+      
+      {/* 大气辉光 */}
+      <mesh scale={1.08}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshBasicMaterial 
+          color={'#64b5f6'} 
+          transparent 
+          opacity={0.1} 
+          side={THREE.BackSide} 
+        />
+      </mesh>
+      
+      {/* 内部大气 */}
+      <mesh scale={1.02}>
+        <sphereGeometry args={[1, 16, 16]} />
+        <meshBasicMaterial 
+          color={'#e3f2fd'} 
+          transparent 
+          opacity={0.05} 
+        />
+      </mesh>
+      
+      {/* 3D传感器标记已移除，使用2D覆盖层 */}
     </group>
   )
 }
 
-function Controls3D({ onDropDevice }) {
-  const { gl, camera, scene } = useThree()
-  // 拖拽投放支持：监听原生 dragover/drop，将落点映射到球面
+// ===== 2D拖拽预览组件 =====
+function DragPreview2D({ position, visible, sensorType, containerRef }) {
+  const [pulsePhase, setPulsePhase] = useState(0)
+  
   useEffect(() => {
-    const dom = gl.domElement
-    const handleOver = (e) => { e.preventDefault() }
-    const handleDrop = (e) => {
-      e.preventDefault()
-      const key = e.dataTransfer.getData('text/plain')
-      if (!key) return
-      const rect = dom.getBoundingClientRect()
-      const xNorm = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      const yNorm = -((e.clientY - rect.top) / rect.height) * 2 + 1
-      const ray = new THREE.Raycaster()
-      ray.setFromCamera(new THREE.Vector2(xNorm, yNorm), camera)
-      const globe = scene.children.find((c) => c.geometry && c.geometry.type === 'SphereGeometry')
-      if (!globe) return
-      const hit = ray.intersectObject(globe)
-      if (hit && hit[0]) {
-        // 告知世界坐标（单位球面）
-        const p = hit[0].point.clone().normalize()
-        onDropDevice?.(key, { x: p.x, y: p.y, z: p.z })
-      }
-    }
-    dom.addEventListener('dragover', handleOver)
-    dom.addEventListener('drop', handleDrop)
-    return () => {
-      dom.removeEventListener('dragover', handleOver)
-      dom.removeEventListener('drop', handleDrop)
-    }
-  }, [gl, camera, scene, onDropDevice])
-  return <OrbitControls enablePan={false} maxDistance={3} minDistance={1.6} />
-}
-
-function LegendHint() {
+    if (!visible) return
+    const interval = setInterval(() => {
+      setPulsePhase(prev => prev + 0.2)
+    }, 50)
+    return () => clearInterval(interval)
+  }, [visible])
+  
+  if (!visible || !position || !containerRef.current) return null
+  
+  // 将3D位置转换为2D屏幕坐标
+  const rect = containerRef.current.getBoundingClientRect()
+  const centerX = rect.width / 2
+  const centerY = rect.height / 2
+  const earthRadius = Math.min(centerX, centerY) * 0.8
+  
+  const screenX = centerX + position.x * earthRadius
+  const screenY = centerY - position.y * earthRadius
+  
+  const colors = {
+    satellite: { border: 'border-blue-400', bg: 'bg-blue-400/20', shadow: 'shadow-blue-400/50' },
+    ground: { border: 'border-green-400', bg: 'bg-green-400/20', shadow: 'shadow-green-400/50' },
+    radar: { border: 'border-orange-400', bg: 'bg-orange-400/20', shadow: 'shadow-orange-400/50' },
+    buoy: { border: 'border-purple-400', bg: 'bg-purple-400/20', shadow: 'shadow-purple-400/50' }
+  }[sensorType] || { border: 'border-cyan-400', bg: 'bg-cyan-400/20', shadow: 'shadow-cyan-400/50' }
+  
+  const pulseScale = 1 + Math.sin(pulsePhase) * 0.4
+  
   return (
-    <div className="absolute left-3 bottom-3 text-[11px] text-slate-400 bg-slate-800/60 border border-slate-700/60 rounded px-2 py-1">
-      蓝色：采集中  绿色：完成
+    <div
+      className="absolute pointer-events-none z-20"
+      style={{
+        left: `${screenX}px`,
+        top: `${screenY}px`,
+        transform: 'translate(-50%, -50%)'
+      }}
+    >
+      {/* 主预览圈 */}
+      <div 
+        className={`absolute rounded-full border-4 ${colors.border} ${colors.bg} animate-pulse shadow-lg ${colors.shadow}`}
+        style={{
+          width: '60px',
+          height: '60px',
+          left: '50%',
+          top: '50%',
+          transform: `translate(-50%, -50%) scale(${pulseScale})`
+        }}
+      ></div>
+      
+      {/* 中心点 */}
+      <div className={`absolute w-2 h-2 rounded-full ${colors.bg} border ${colors.border}`}
+        style={{
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)'
+        }}
+      ></div>
+      
+      {/* 外圈效果 */}
+      <div 
+        className={`absolute rounded-full border-2 ${colors.border} animate-ping`}
+        style={{
+          width: '80px',
+          height: '80px',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          opacity: 0.5
+        }}
+      ></div>
+      
+      <div 
+        className={`absolute rounded-full border ${colors.border} animate-ping`}
+        style={{
+          width: '100px',
+          height: '100px',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          animationDelay: '0.5s',
+          opacity: 0.3
+        }}
+      ></div>
+      
+      {/* 投射指示线 */}
+      <div 
+        className={`absolute ${colors.bg} opacity-60`}
+        style={{
+          width: '2px',
+          height: '50px',
+          left: '50%',
+          top: '100%',
+          transformOrigin: 'top',
+          transform: 'translateX(-50%)',
+          background: `linear-gradient(to bottom, ${colors.border.replace('border-', '').replace('400', '400')}, transparent)`
+        }}
+      ></div>
     </div>
   )
 }
+
+// ===== 数据粒子系统 =====
+function DataParticles({ startPos, endPos, active, color }) {
+  const pointsRef = useRef()
+  const [particles] = useState(() => {
+    const positions = new Float32Array(60)
+    const start = new THREE.Vector3(startPos.x, startPos.y, startPos.z)
+    const end = new THREE.Vector3(0, 0, 0) // 地球中心
+    
+    for (let i = 0; i < 20; i++) {
+      const t = i / 19
+      const pos = start.clone().lerp(end, t)
+      positions[i * 3] = pos.x
+      positions[i * 3 + 1] = pos.y
+      positions[i * 3 + 2] = pos.z
+    }
+    return positions
+  })
+  
+  useFrame((_, delta) => {
+    if (pointsRef.current && active) {
+      pointsRef.current.rotation.z += delta * 2
+    }
+  })
+  
+  if (!active) return null
+  
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          array={particles}
+          count={20}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial size={0.02} color={color} transparent opacity={0.8} />
+    </points>
+  )
+}
+
+// ===== 3D 传感器标记组件 =====
+function SensorMarker3D({ marker, isActive }) {
+  const groupRef = useRef()
+  const beamRef = useRef()
+  const [pulsePhase, setPulsePhase] = useState(0)
+  const [animationPhase, setAnimationPhase] = useState(0)
+  
+  useFrame((_, delta) => {
+    if (!groupRef.current) return
+    
+    setPulsePhase(prev => prev + delta * 2)
+    setAnimationPhase(prev => prev + delta)
+    
+    if (isActive) {
+      // 活跃状态的动画
+      if (marker.type === 'radar') {
+        groupRef.current.rotation.y += delta * 3
+      } else if (marker.type === 'satellite') {
+        groupRef.current.rotation.z += delta * 1.5
+      } else if (marker.type === 'buoy') {
+        groupRef.current.position.y += Math.sin(animationPhase * 2) * 0.005
+      }
+      
+      // 光束效果
+      if (beamRef.current) {
+        beamRef.current.material.opacity = 0.3 + Math.sin(pulsePhase * 2) * 0.2
+      }
+    }
+  })
+  
+  const color = {
+    satellite: '#4DA3FF',
+    ground: '#1FD38A',
+    radar: '#FFA500', 
+    buoy: '#A16EFF'
+  }[marker.type] || '#ffffff'
+  
+  const worldPos = new THREE.Vector3(marker.x, marker.y, marker.z).normalize()
+  
+  return (
+    <group ref={groupRef} position={[worldPos.x * 1.05, worldPos.y * 1.05, worldPos.z * 1.05]}>
+      {/* 主体标记 */}
+      <mesh>
+        <sphereGeometry args={[0.025, 12, 12]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      
+      {/* 脉冲环 */}
+      <mesh rotation={[Math.PI/2, 0, 0]}>
+        <ringGeometry args={[0.04, 0.08, 16]} />
+        <meshBasicMaterial 
+          color={color} 
+          transparent 
+          opacity={0.6 + Math.sin(pulsePhase) * 0.3} 
+        />
+      </mesh>
+      
+      {/* 数据传输光束 */}
+      {isActive && (
+        <mesh 
+          ref={beamRef}
+          position={[0, 0, -0.5]}
+          rotation={[Math.PI/2, 0, 0]}
+        >
+          <cylinderGeometry args={[0.015, 0.04, 1, 8]} />
+          <meshBasicMaterial color={color} transparent opacity={0.4} />
+        </mesh>
+      )}
+      
+      {/* 外层脉冲环 */}
+      {isActive && (
+        <mesh rotation={[Math.PI/2, 0, 0]} scale={1 + Math.sin(pulsePhase * 1.5) * 0.2}>
+          <ringGeometry args={[0.08, 0.12, 16]} />
+          <meshBasicMaterial 
+            color={color} 
+            transparent 
+            opacity={0.3} 
+          />
+        </mesh>
+      )}
+      
+      {/* 特殊类型效果 */}
+      {marker.type === 'radar' && isActive && (
+        <>
+          <mesh rotation={[0, pulsePhase, 0]}>
+            <ringGeometry args={[0.12, 0.16, 32]} />
+            <meshBasicMaterial color={color} transparent opacity={0.2} />
+          </mesh>
+          <mesh rotation={[0, -pulsePhase * 0.5, 0]}>
+            <ringGeometry args={[0.16, 0.2, 32]} />
+            <meshBasicMaterial color={color} transparent opacity={0.1} />
+          </mesh>
+        </>
+      )}
+      
+      {marker.type === 'satellite' && isActive && (
+        <DataParticles 
+          startPos={worldPos}
+          endPos={{x: 0, y: 0, z: 0}}
+          active={isActive}
+          color={color}
+        />
+      )}
+      
+      {marker.type === 'ground' && isActive && (
+        <mesh position={[0, 0, -0.1]}>
+          <cylinderGeometry args={[0.06, 0.02, 0.2, 8]} />
+          <meshBasicMaterial color={color} transparent opacity={0.3} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
+// ===== 3D 地球控制组件 =====
+function EarthControls({ onDropDevice, containerRef, setDragPreview }) {
+  const { gl, camera, scene } = useThree()
+  
+  useEffect(() => {
+    const handleDragOver = (e) => {
+      e.preventDefault()
+      
+      const rect = gl.domElement.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      
+      const raycaster = new THREE.Raycaster()
+      raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
+      
+      const sphere = scene.children.find(child => 
+        child.geometry && child.geometry.type === 'SphereGeometry' && child.scale.x === 1
+      )
+      
+      if (sphere) {
+        const intersects = raycaster.intersectObject(sphere)
+        if (intersects.length > 0) {
+          const point = intersects[0].point.normalize()
+          const sensorType = e.dataTransfer.getData('text/plain') || 'satellite'
+          
+          setDragPreview({
+            visible: true,
+            position: point,
+            sensorType: sensorType
+          })
+        } else {
+          setDragPreview({ visible: false, position: null, sensorType: null })
+        }
+      }
+    }
+    
+    const handleDragLeave = () => {
+      setDragPreview({ visible: false, position: null, sensorType: null })
+    }
+    
+    const handleDrop = (e) => {
+      e.preventDefault()
+      setDragPreview({ visible: false, position: null, sensorType: null })
+      
+      const key = e.dataTransfer.getData('text/plain')
+      if (!key) return
+      
+      const rect = gl.domElement.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      
+      const raycaster = new THREE.Raycaster()
+      raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
+      
+      const sphere = scene.children.find(child => 
+        child.geometry && child.geometry.type === 'SphereGeometry' && child.scale.x === 1
+      )
+      
+      if (sphere) {
+        const intersects = raycaster.intersectObject(sphere)
+        if (intersects.length > 0) {
+          const point = intersects[0].point.normalize()
+          onDropDevice?.(key, { x: point.x, y: point.y, z: point.z })
+        }
+      }
+    }
+    
+    gl.domElement.addEventListener('dragover', handleDragOver)
+    gl.domElement.addEventListener('dragleave', handleDragLeave)
+    gl.domElement.addEventListener('drop', handleDrop)
+    
+    return () => {
+      gl.domElement.removeEventListener('dragover', handleDragOver)
+      gl.domElement.removeEventListener('dragleave', handleDragLeave)
+      gl.domElement.removeEventListener('drop', handleDrop)
+    }
+  }, [gl, camera, scene, onDropDevice])
+  
+  return (
+    <OrbitControls enablePan={false} maxDistance={4} minDistance={2} />
+  )
+}
+
+// ===== 纹理状态显示组件 =====
+function TextureStatus() {
+  return null // 在3D场景中不需要显示状态
+}
+
+// useThree 已从 @react-three/fiber 导入
 
 // 汇总显示用：如某字段不存在，用 format 默认值
 function mergeMetric(state, key, format, allowEmpty = false) {
@@ -349,43 +1083,53 @@ function DataBlock({ title, value }) {
 }
 
 // 自定义图标，尽量贴近截图视觉（线性 + 简洁）
-function SensorIcon({ type, size = 18 }) {
-  const common = 'stroke-sky-300'
+function SensorIconBox({ type, size = 20 }) {
+  const styleMap = {
+    satellite: { bg: 'from-sky-900 to-sky-700', chip: 'bg-violet-400' },
+    ground: { bg: 'from-emerald-900 to-emerald-700', chip: 'bg-emerald-400' },
+    radar: { bg: 'from-amber-900 to-amber-700', chip: 'bg-amber-400' },
+    buoy: { bg: 'from-indigo-900 to-indigo-700', chip: 'bg-indigo-400' },
+  }
+  const m = styleMap[type] || styleMap.satellite
   const s = { width: size, height: size }
-  if (type === 'satellite') {
-    return (
-      <svg viewBox="0 0 24 24" style={s} fill="none" className={common} strokeWidth="1.6">
-        <rect x="10" y="10" width="4" height="4" rx="1" stroke="currentColor" />
-        <path d="M6 6l4 4M14 14l4 4M14 10l4-4M6 18l4-4" stroke="currentColor" />
-      </svg>
-    )
-  }
-  if (type === 'ground') {
-    return (
-      <svg viewBox="0 0 24 24" style={s} fill="none" className={common} strokeWidth="1.6">
-        <path d="M4 18h16M8 18V9l4-3 4 3v9" stroke="currentColor" />
-        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
-      </svg>
-    )
-  }
-  if (type === 'radar') {
-    return (
-      <svg viewBox="0 0 24 24" style={s} fill="none" className={common} strokeWidth="1.6">
-        <circle cx="12" cy="12" r="7" stroke="currentColor" />
-        <path d="M12 12l6-2" stroke="currentColor" />
-        <circle cx="12" cy="12" r="2" stroke="currentColor" />
-      </svg>
-    )
-  }
-  // buoy
+  const iconColor = '#eef2ff'
   return (
-    <svg viewBox="0 0 24 24" style={s} fill="none" className={common} strokeWidth="1.6">
-      <path d="M4 18c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2" stroke="currentColor" />
-      <path d="M12 14v-6l-2-2" stroke="currentColor" />
-      <circle cx="12" cy="5" r="1" stroke="currentColor" />
-    </svg>
+    <div className={`relative rounded-md bg-gradient-to-br ${m.bg} border border-white/10 shadow-[0_0_12px_rgba(2,132,199,0.25)]`} style={s}>
+      <div className={`absolute -top-0.5 -left-0.5 w-2 h-2 rounded-full ${m.chip}`} />
+      {/* glyph */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {type === 'satellite' && (
+          <svg viewBox="0 0 24 24" width={size-6} height={size-6} fill="none" stroke={iconColor} strokeWidth="1.6">
+            <path d="M6 6l4 4M14 14l4 4M14 10l4-4M6 18l4-4" />
+            <rect x="10" y="10" width="4" height="4" rx="1" stroke={iconColor} />
+          </svg>
+        )}
+        {type === 'ground' && (
+          <svg viewBox="0 0 24 24" width={size-6} height={size-6} fill="none" stroke={iconColor} strokeWidth="1.6">
+            <path d="M4 18h16M8 18V9l4-3 4 3v9" />
+            <circle cx="12" cy="12" r="1.6" fill={iconColor} />
+          </svg>
+        )}
+        {type === 'radar' && (
+          <svg viewBox="0 0 24 24" width={size-6} height={size-6} fill="none" stroke={iconColor} strokeWidth="1.6">
+            <circle cx="12" cy="12" r="7" />
+            <path d="M12 12l6-2" />
+            <circle cx="12" cy="12" r="2" />
+          </svg>
+        )}
+        {type === 'buoy' && (
+          <svg viewBox="0 0 24 24" width={size-6} height={size-6} fill="none" stroke={iconColor} strokeWidth="1.6">
+            <path d="M4 18c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2" />
+            <path d="M12 14v-6l-2-2" />
+            <circle cx="12" cy="5" r="1" />
+          </svg>
+        )}
+      </div>
+    </div>
   )
 }
+
+// 纹理相关函数已移除，改用2D CSS/SVG实现
 
 function StatusPill({ status }) {
   const map = {
@@ -402,6 +1146,386 @@ function Metric({ label, value }) {
     <div className="rounded bg-slate-900/50 border border-slate-700/60 px-2 py-1">
       <span className="text-slate-400 mr-1">{label}</span>
       <span className="text-slate-100">{value}</span>
+    </div>
+  )
+}
+
+// 2D地球组件已移除，改用3D实现
+
+// ===== 2D 传感器标记 =====
+function Markers2D({ markers, devicesState }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="relative w-[85%] max-w-[480px] aspect-square">
+        {markers.map((m) => (
+          <Marker2D key={m.id} marker={m} devicesState={devicesState} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Marker2D({ marker, devicesState }) {
+  const [isAnimating, setIsAnimating] = useState(true)
+  const [pulsePhase, setPulsePhase] = useState(0)
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setIsAnimating(false), 1500)
+    return () => clearTimeout(timer)
+  }, [])
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPulsePhase(prev => prev + 0.1)
+    }, 50)
+    return () => clearInterval(interval)
+  }, [])
+  
+  // 转换3D坐标到2D屏幕位置
+  const worldPos = new THREE.Vector3(
+    (marker.x - 50) / 30,
+    -(marker.y - 50) / 30,
+    Math.sqrt(Math.max(0, 1 - Math.pow((marker.x - 50) / 30, 2) - Math.pow((marker.y - 50) / 30, 2)))
+  ).normalize()
+  
+  const centerX = 50
+  const centerY = 50
+  const projectionScale = 35
+  
+  const x = centerX + worldPos.x * projectionScale
+  const y = centerY - worldPos.y * projectionScale
+  
+  // 获取传感器类型和状态
+  const sensorType = marker.key // marker对象使用key字段
+  const sensorStatus = devicesState[sensorType]?.status || 'idle'
+  const isActive = sensorStatus === 'collecting' || sensorStatus === 'done' // 采集中或完成时都显示动画
+  const isCompleted = sensorStatus === 'done'
+  
+  const getMarkerIcon = (type) => {
+    const iconMap = {
+      satellite: FaSatellite,  // 卫星
+      ground: MdHome,          // 地面站
+      radar: MdRadar,          // 雷达
+      buoy: FaShip             // 浮标
+    }
+    return iconMap[type] || FaSatellite
+  }
+  
+  const getIconColor = (type) => {
+    const colorMap = {
+      satellite: '#4DA3FF',
+      ground: '#1FD38A',
+      radar: '#FFA500',
+      buoy: '#A16EFF'
+    }
+    return colorMap[type] || '#4DA3FF'
+  }
+  
+  const getMarkerColor = (type) => {
+    const colorMap = {
+      satellite: 'border-blue-400 bg-blue-400/20',
+      ground: 'border-green-400 bg-green-400/20',
+      radar: 'border-orange-400 bg-orange-400/20',
+      buoy: 'border-purple-400 bg-purple-400/20'
+    }
+    return colorMap[type] || 'border-cyan-400 bg-cyan-400/20'
+  }
+  
+  const pulseScale = 1 + Math.sin(pulsePhase) * 0.3
+  
+  // 特定传感器的动画效果
+  const getIconAnimation = (type) => {
+    if (!isActive) return isAnimating ? 'animate-bounce' : ''
+    
+    // 采集中使用更强烈的动画，完成后使用温和的动画
+    const intensity = sensorStatus === 'collecting' ? 'fast' : 'normal'
+    
+    switch(type) {
+      case 'satellite':
+        return intensity === 'fast' ? 'animate-pulse' : 'animate-pulse' // 卫星发送信号脉冲
+      case 'ground':
+        return intensity === 'fast' ? 'animate-pulse' : 'animate-pulse' // 地面站接收信号脉冲
+      case 'radar':
+        return 'animate-spin' // 雷达旋转
+      case 'buoy':
+        return '' // 浮标有自定义浮动动画
+      default:
+        return 'animate-pulse'
+    }
+  }
+  
+  return (
+    <div
+      className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ 
+        left: `${x}%`, 
+        top: `${y}%`,
+        zIndex: 10
+      }}
+    >
+      {/* 主体图标 */}
+      <div 
+        className={`relative text-2xl ${getIconAnimation(sensorType)}`}
+        style={{
+          // 浮标特殊浮动动画
+          transform: sensorType === 'buoy' && isActive ? 
+            `translateY(${Math.sin(pulsePhase * 2) * 3}px)` : 'none'
+        }}
+      >
+        <div className="flex items-center justify-center">
+          {(() => {
+            const IconComponent = getMarkerIcon(sensorType)
+            const iconColor = getIconColor(sensorType)
+            return (
+              <IconComponent 
+                size={20} 
+                color={iconColor}
+                style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.5))' }}
+              />
+            )
+          })()}
+        </div>
+        
+        {/* 基础脉冲圈 */}
+        <div 
+          className={`absolute inset-0 rounded-full border-2 ${getMarkerColor(sensorType)} -z-10 ${sensorStatus === 'collecting' ? 'animate-ping' : ''}`}
+          style={{
+            width: '40px',
+            height: '40px',
+            left: '50%',
+            top: '50%',
+            transform: `translate(-50%, -50%) scale(${isActive ? pulseScale : 1})`,
+            opacity: sensorStatus === 'collecting' ? 0.8 : 0.6
+          }}
+        ></div>
+        
+        {/* 传感器特效 */}
+        {sensorType === 'radar' && isActive && (
+          <>
+            {/* 雷达扫描圈 - 辐射效果 */}
+            <div 
+              className="absolute rounded-full border-2 border-orange-300/80 animate-spin"
+              style={{
+                width: '60px',
+                height: '60px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                borderTopColor: 'transparent',
+                borderRightColor: 'transparent',
+                animationDuration: '2s'
+              }}
+            ></div>
+            {/* 外层辐射圈 */}
+            <div 
+              className="absolute rounded-full border border-orange-300/50"
+              style={{
+                width: '80px',
+                height: '80px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+            {/* 最外层辐射圈 */}
+            <div 
+              className="absolute rounded-full border border-orange-300/30"
+              style={{
+                width: '100px',
+                height: '100px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animation: 'ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+          </>
+        )}
+        
+        {sensorType === 'satellite' && isActive && (
+          <>
+            {/* 卫星信号发送圈 */}
+            <div className="absolute rounded-full border-2 border-blue-300/80 animate-ping"
+              style={{
+                width: '50px',
+                height: '50px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+            {/* 信号传播圈 */}
+            <div className="absolute rounded-full border border-blue-300/60 animate-ping"
+              style={{
+                width: '70px',
+                height: '70px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animationDelay: '0.3s',
+                animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+            {/* 外层信号圈 */}
+            <div className="absolute rounded-full border border-blue-300/40 animate-ping"
+              style={{
+                width: '90px',
+                height: '90px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animationDelay: '0.6s',
+                animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+            {/* 数据流动效果 */}
+            <div 
+              className="absolute"
+              style={{
+                width: '2px',
+                height: '30px',
+                left: '50%',
+                top: '100%',
+                background: 'linear-gradient(to bottom, #60a5fa, transparent)',
+                transform: 'translateX(-50%)',
+                opacity: 0.7 + Math.sin(pulsePhase * 4) * 0.3
+              }}
+            ></div>
+          </>
+        )}
+        
+        {sensorType === 'buoy' && isActive && (
+          <>
+            {/* 浮标水波纹 - 模拟海浪 */}
+            <div className="absolute rounded-full border-2 border-purple-300/70"
+              style={{
+                width: '50px',
+                height: '50px',
+                left: '50%',
+                top: '50%',
+                transform: `translate(-50%, -50%) scale(${Math.sin(pulsePhase * 1.5) * 0.3 + 1})`,
+                opacity: 0.8 - Math.sin(pulsePhase * 1.5) * 0.3
+              }}
+            ></div>
+            {/* 第二层波纹 */}
+            <div className="absolute rounded-full border border-purple-300/50"
+              style={{
+                width: '70px',
+                height: '70px',
+                left: '50%',
+                top: '50%',
+                transform: `translate(-50%, -50%) scale(${Math.sin(pulsePhase * 1.2 + 1) * 0.4 + 1})`,
+                opacity: 0.6 - Math.sin(pulsePhase * 1.2) * 0.2
+              }}
+            ></div>
+            {/* 第三层波纹 */}
+            <div className="absolute rounded-full border border-purple-300/30"
+              style={{
+                width: '90px',
+                height: '90px',
+                left: '50%',
+                top: '50%',
+                transform: `translate(-50%, -50%) scale(${Math.sin(pulsePhase * 0.8 + 2) * 0.5 + 1})`,
+                opacity: 0.4 - Math.sin(pulsePhase * 0.8) * 0.15
+              }}
+            ></div>
+            {/* 浮标锚链效果 */}
+            <div 
+              className="absolute border-l border-purple-300/40"
+              style={{
+                width: '0px',
+                height: '25px',
+                left: '50%',
+                top: '100%',
+                transform: 'translateX(-50%)',
+                borderStyle: 'dashed'
+              }}
+            ></div>
+          </>
+        )}
+        
+        {sensorType === 'ground' && isActive && (
+          <>
+            {/* 地面站接收信号脉冲 */}
+            <div className="absolute rounded-full border-2 border-green-300/80"
+              style={{
+                width: '45px',
+                height: '45px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animation: 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+              }}
+            ></div>
+            {/* 信号接收圈 */}
+            <div className="absolute rounded-full border border-green-300/60 animate-ping"
+              style={{
+                width: '65px',
+                height: '65px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animation: 'ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+            {/* 外层接收圈 */}
+            <div className="absolute rounded-full border border-green-300/40 animate-ping"
+              style={{
+                width: '85px',
+                height: '85px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                animationDelay: '0.4s',
+                animation: 'ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite'
+              }}
+            ></div>
+            {/* 天线指向效果 */}
+            <div 
+              className="absolute bg-green-300/60"
+              style={{
+                width: '2px',
+                height: '20px',
+                left: '50%',
+                top: '-20px',
+                transform: 'translateX(-50%)',
+                opacity: 0.6 + Math.sin(pulsePhase * 3) * 0.4
+              }}
+            ></div>
+            {/* 数据接收指示 */}
+            <div 
+              className="absolute"
+              style={{
+                width: '1px',
+                height: '15px',
+                left: '50%',
+                top: '-10px',
+                background: 'linear-gradient(to top, transparent, #86efac)',
+                transform: 'translateX(-50%)',
+                opacity: 0.5 + Math.sin(pulsePhase * 5) * 0.3
+              }}
+            ></div>
+          </>
+        )}
+        
+        {/* 数据传输线 */}
+        {isActive && (
+          <div 
+            className="absolute bg-gradient-to-t from-transparent via-white/20 to-transparent"
+            style={{
+              width: '2px',
+              height: '100px',
+              left: '50%',
+              top: '100%',
+              transformOrigin: 'top',
+              transform: 'translateX(-50%)',
+              opacity: 0.4 + Math.sin(pulsePhase * 3) * 0.3
+            }}
+          ></div>
+        )}
+      </div>
     </div>
   )
 }
