@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { CloudSun, Globe2 } from 'lucide-react'
+import { CloudSun, Globe2, Brain } from 'lucide-react'
 
 export default function NavBar() {
   const loc = useLocation()
@@ -13,6 +13,7 @@ export default function NavBar() {
         <div className="flex items-center gap-6 text-sm">
           <Link to="/" className={`flex items-center gap-1 ${isActive('/')}`}><CloudSun size={14}/> 演示主页面</Link>
           <Link to="/earth" className={`flex items-center gap-1 ${isActive('/earth')}`}><Globe2 size={14}/> 3D 动态地球</Link>
+          <Link to="/clustering" className={`flex items-center gap-1 ${isActive('/clustering')}`}><Brain size={14}/> 聚类案例</Link>
         </div>
       </div>
     </nav>

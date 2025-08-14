@@ -49,16 +49,27 @@ export default function StageTwo({ onComplete, isPaused, isAutoPlay = true, spee
   const [currentPhase, setCurrentPhase] = useState('preprocessing') // preprocessing -> fusing -> unified
   const [dataStreams, setDataStreams] = useState({})
   const [localFusedData, setLocalFusedData] = useState(null)
+  const [isDataReceived, setIsDataReceived] = useState(false) // 新增：跟踪数据接收完成状态
   const fusionCtrl = useAnimationControls()
   const streamCtrl = useAnimationControls()
 
   // 模拟从阶段一获取的异构数据
   const mockStageOneData = useMemo(() => ({
     satellite: { cloudCoverage: 72, cloudTopTemp: -45, waterVapor: 24, surfaceTemp: 15, solarRadiation: 850, atmosphericTopTemp: -65, quality: 94 },
-    ground: { airTemperature: 18, relativeHumidity: 68, atmosphericPressure: 1013, windSpeed: 12, windDirection: 'NE', precipitation: 2.5, visibility: 8.5, quality: 91 },
+    ground: { airTemperature: 18, relativeHumidity: 68, atmosphericPressure: 1008, windSpeed: 12, windDirection: 'NE', precipitation: 2.5, visibility: 8.5, quality: 91 },
     radar: { precipitationIntensity: 5.2, radarReflectivity: 35, radialVelocity: -8, echoTopHeight: 6.8, verticalLiquidWater: 12, windFieldIntensity: 15, quality: 88 },
     buoy: { seaSurfaceTemp: 19.5, waveHeight: 2.3, wavePeriod: 7.8, oceanCurrentSpeed: 1.2, salinity: 35.2, seaSurfaceWind: 14, quality: 92 }
   }), [])
+
+  // 重置状态当阶段重新开始
+  useEffect(() => {
+    // 当组件重新挂载或重新开始时，重置状态
+    setCurrentPhase('preprocessing')
+    setLocalFusedData(null)
+    setIsDataReceived(false)
+    // 重置动画控制器
+    streamCtrl.set({ width: '0%' })
+  }, [streamCtrl]) // 只在组件挂载时执行一次
 
   // 异构数据融合流程
   useEffect(() => {
@@ -104,13 +115,19 @@ export default function StageTwo({ onComplete, isPaused, isAutoPlay = true, spee
         rotate: [0, 360, 720],
         transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' } 
       })
-    } else if (currentPhase === 'unified') {
+    } else if (currentPhase === 'unified' && !isDataReceived) {
+      // 修改：数据流动画只执行一次，完成后设置数据接收完成状态
       streamCtrl.start({ 
-        x: ['0%', '100%'], 
-        transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' } 
+        width: ['0%', '100%'], 
+        transition: { duration: 2, ease: 'easeInOut' } 
+      }).then(() => {
+        // 动画完成后设置数据接收完成状态
+        setTimeout(() => {
+          setIsDataReceived(true)
+        }, 500) // 延迟500ms确保动画完全完成
       })
     }
-  }, [isPaused, currentPhase, fusionCtrl, streamCtrl])
+  }, [isPaused, currentPhase, fusionCtrl, streamCtrl, isDataReceived])
 
   // 生成融合数据
   const generateFusedData = (sourceData, weight) => {
@@ -216,18 +233,36 @@ export default function StageTwo({ onComplete, isPaused, isAutoPlay = true, spee
                 transition={{ delay: 0.5 }}
               >
                 <motion.div
-                  className="w-4 h-4 rounded-full border-2 border-emerald-400/60 bg-emerald-900/40 flex items-center justify-center"
-                  animate={{
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    isDataReceived 
+                      ? 'border-emerald-400 bg-emerald-400/20' 
+                      : 'border-emerald-400/60 bg-emerald-900/40'
+                  }`}
+                  animate={!isDataReceived ? {
                     scale: [1, 1.2, 1],
                     borderColor: ['#10b98160', '#10b981ff', '#10b98160']
+                  } : {
+                    scale: 1,
+                    borderColor: '#10b981'
                   }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+                  transition={{ duration: 1.5, repeat: !isDataReceived ? Infinity : 0 }}
                 >
-                  <motion.div
-                    className="w-1 h-1 bg-emerald-400 rounded-full"
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  />
+                  {isDataReceived ? (
+                    <motion.div
+                      className="text-emerald-400 text-xs font-bold"
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      ✓
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      className="w-1 h-1 bg-emerald-400 rounded-full"
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    />
+                  )}
                 </motion.div>
               </motion.div>
             )}
@@ -236,21 +271,24 @@ export default function StageTwo({ onComplete, isPaused, isAutoPlay = true, spee
               <div className="flex items-center gap-2 mb-4">
                 <motion.div 
                   className="w-3 h-3 rounded-full bg-emerald-400"
-                  animate={currentPhase === 'unified' ? {
+                  animate={currentPhase === 'unified' && !isDataReceived ? {
                     opacity: [0.6, 1, 0.6],
                     scale: [1, 1.1, 1]
+                  } : isDataReceived ? {
+                    opacity: 1,
+                    scale: 1
                   } : {}}
-                  transition={{ duration: 1.5, repeat: currentPhase === 'unified' ? Infinity : 0 }}
+                  transition={{ duration: 1.5, repeat: currentPhase === 'unified' && !isDataReceived ? Infinity : 0 }}
                 />
                 <span className="text-sky-300 font-semibold">融合结果</span>
                 {currentPhase === 'unified' && (
                   <motion.span
-                    className="text-xs text-emerald-300 ml-auto"
+                    className={`text-xs ml-auto ${isDataReceived ? 'text-emerald-400' : 'text-emerald-300'}`}
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.8 }}
                   >
-                    数据接收中...
+                    {isDataReceived ? '数据接收成功 ✓' : '数据接收中...'}
                   </motion.span>
                 )}
               </div>
@@ -273,14 +311,31 @@ export default function StageTwo({ onComplete, isPaused, isAutoPlay = true, spee
       {currentPhase === 'unified' && (
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-green-400"></div>
-            <span className="text-sm text-slate-300">融合数据流 → 阶段三</span>
+            <motion.div 
+              className={`w-2 h-2 rounded-full ${isDataReceived ? 'bg-emerald-400' : 'bg-green-400'}`}
+              animate={isDataReceived ? {} : { opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1.5, repeat: isDataReceived ? 0 : Infinity }}
+            />
+            <span className="text-sm text-slate-300">
+              融合数据流 → 阶段三 {isDataReceived && <span className="text-emerald-400 ml-2">✓ 传输完成</span>}
+            </span>
           </div>
           <div className="relative h-4 rounded-lg bg-emerald-500/10 overflow-hidden border border-emerald-500/30">
             <motion.div 
-              className="h-full w-24 bg-gradient-to-r from-emerald-400/80 to-emerald-300/60" 
-              animate={streamCtrl} 
+              className="h-full bg-gradient-to-r from-emerald-400/80 to-emerald-300/60" 
+              initial={{ width: '0%' }}
+              animate={isDataReceived ? { width: '100%' } : streamCtrl}
+              transition={isDataReceived ? { duration: 0.5, ease: 'easeOut' } : undefined}
             />
+            {/* 完成时的静态指示器 */}
+            {isDataReceived && (
+              <motion.div
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-emerald-400 rounded-full"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+              />
+            )}
           </div>
         </div>
       )}

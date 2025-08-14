@@ -22,7 +22,7 @@ function computeWeatherPrediction(fusedData, weatherWeights) {
     fusedData = {
       temperature: 16.5,
       humidity: 64,
-      pressure: 1013,
+      pressure: 1008,
       windSpeed: 13.5,
       precipitation: 3.9,
       cloudiness: 72
@@ -40,8 +40,13 @@ function computeWeatherPrediction(fusedData, weatherWeights) {
   // 湿度因子：湿度越高越容易降雨 (0-100 -> 0-40分)
   const humidityContrib = (fusedData.humidity / 100) * 40 * humidityWeight
   
-  // 气压因子：低气压容易降雨 (1013为标准，低于1010有利降雨，0-30分)
-  const pressureContrib = Math.max(0, (1013 - fusedData.pressure)) * 0.6 * pressureWeight
+  // 气压因子：考虑气压变化对降雨的影响 (1013为标准，偏离越大影响越强，0-30分)
+  // 使用气压距平的绝对值，并考虑低气压和高气压的不同影响
+  const pressureAnomaly = fusedData.pressure - 1013
+  const pressureContrib = Math.min(30, 
+    Math.abs(pressureAnomaly) * 0.3 + 
+    (pressureAnomaly < 0 ? Math.abs(pressureAnomaly) * 0.5 : 0) // 低气压额外加权
+  ) * pressureWeight
   
   // 云量因子：云量越多越容易降雨 (0-100 -> 0-35分)
   const cloudinessContrib = (fusedData.cloudiness / 100) * 35 * cloudinessWeight
@@ -152,7 +157,7 @@ export default function StageThree({ onComplete, isPaused, isAutoPlay = true, sp
     const d = fusedData || {
       temperature: 16.5,
       humidity: 64,
-      pressure: 1013,
+      pressure: 1008,
       windSpeed: 13.5,
       precipitation: 3.9,
       cloudiness: 72,

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-means图片压缩工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>K-means图片压缩工具</h1>
+            <p>基于聚类算法的智能图片压缩，支持多种压缩级别</p>
+            
+            <div class="experiment-nav">
+                <div class="nav-item active" data-page="page0" onclick="navigateToPage('page0')">
+                    <div class="nav-icon">🏪</div>
+                    <div class="nav-title">入门体验</div>
+                    <div class="nav-desc">商品价格聚类</div>
+                    <div class="nav-status unlocked">已解锁</div>
+                </div>
+                <div class="nav-item" data-page="page1" onclick="navigateToPage('page1')">
+                    <div class="nav-icon">🎯</div>
+                    <div class="nav-title">K-means演示</div>
+                    <div class="nav-desc">聚类算法可视化</div>
+                    <div class="nav-status unlocked">已解锁</div>
+                </div>
+                <div class="nav-item" data-page="page2" onclick="navigateToPage('page2')">
+                    <div class="nav-icon">🎓</div>
+                    <div class="nav-title">流程排序</div>
+                    <div class="nav-desc">拖拽排序学习</div>
+                    <div class="nav-status unlocked">已解锁</div>
+                </div>
+                <div class="nav-item" data-page="page3" onclick="navigateToPage('page3')">
+                    <div class="nav-icon">💻</div>
+                    <div class="nav-title">代码学习</div>
+                    <div class="nav-desc">参数填写练习</div>
+                    <div class="nav-status unlocked">已解锁</div>
+                </div>
+                <div class="nav-item" data-page="page4" onclick="navigateToPage('page4')">
+                    <div class="nav-icon">🖼️</div>
+                    <div class="nav-title">图片压缩</div>
+                    <div class="nav-desc">实际应用体验</div>
+                    <div class="nav-status unlocked">已解锁</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- K-means算法学习区域 -->
+        
+        <!-- 第零页：入门体验 - 商品价格聚类 -->
+        <div class="page-container" id="page0">
+            <div class="learning-section">
+                <h3>🏪 商品价格聚类分析入门体验</h3>
+                <p class="learning-description">
+                    欢迎来到K-means聚类算法的入门体验！我们将通过一个实际的商业场景来理解聚类算法：
+                </p>
+                
+                <div class="scenario-intro">
+                    <h4>📖 场景背景</h4>
+                    <p>
+                        假设您是一家电商平台的数据分析师，需要分析平台上不同商品的价格分布。
+                        通过K-means聚类算法，我们可以将商品按照价格相似性进行分组，
+                        从而制定不同的营销策略和定价策略。
+                    </p>
+                    <div class="scenario-example">
+                        <strong>应用场景：</strong>
+                        <ul>
+                            <li>🔸 低价商品组（0-50元）：适合促销活动</li>
+                            <li>🔸 中价商品组（50-200元）：常规销售</li>
+                            <li>🔸 高价商品组（200元以上）：精品推荐</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="one-dimension-demo-section">
+                    <div class="demo-controls">
+                        <div class="control-group">
+                            <h4>📊 商品价格数据设置</h4>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label>价格范围（元）：</label>
+                                    <input type="number" id="priceRange" value="500" min="100" max="1000">
+                                </div>
+                            </div>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label>商品数量：</label>
+                                    <input type="number" id="productCount" value="15" min="5" max="30">
+                                </div>
+                            </div>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label>手动添加商品价格：</label>
+                                    <input type="number" id="manualPrice" placeholder="价格（元）" min="0">
+                                </div>
+                                <div class="control-right">
+                                    <button class="add-btn" onclick="addManualPrice()">添加商品</button>
+                                    <button class="generate-btn" onclick="generateRandomPrices()">随机生成</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h4>🎯 聚类设置</h4>
+                            <div class="control-item k-value-row">
+                                <div class="control-left">
+                                    <label>分组数：</label>
+                                    <input type="number" id="priceKValue" value="3" min="2" max="5">
+                                    <button class="init-btn" onclick="initializePriceCentroids()">初始化中心</button>
+                                </div>
+                            </div>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label></label>
+                                </div>
+                                <div class="control-right">
+                                    <button class="start-btn" onclick="startPriceClustering()">开始聚类分析</button>
+                                    <button class="next-btn" onclick="nextPriceStep()">下一步</button>
+                                </div>
+                            </div>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label></label>
+                                </div>
+                                <div class="control-right">
+                                    <button class="auto-btn" onclick="togglePriceAutoMode()">自动演示</button>
+                                    <button class="reset-demo-btn" onclick="resetPriceDemo()">重置</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h4>📊 计算过程</h4>
+                            <div class="calculation-info" id="priceCalculationInfo">
+                                <div class="current-point" id="currentPricePoint">等待开始分析...</div>
+                                <div class="distance-calc" id="priceDistanceCalc"></div>
+                                <div class="cluster-assignment" id="priceClusterAssignment"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-visualization">
+                        <div class="price-axis-container">
+                            <canvas id="priceAxisCanvas" width="750" height="200"></canvas>
+                            <div class="price-axis-info">
+                                <div class="step-info" id="priceStepInfo">准备开始价格聚类分析...</div>
+                                <div class="price-formula">
+                                    <h4>距离计算公式：</h4>
+                                    <div class="latex-formula">
+                                        d(p₁, p₂) = |价格₁ - 价格₂|
+                                    </div>
+                                    <p>其中 p₁ 和 p₂ 是两个商品的价格</p>
+                                </div>
+                                
+                                <div class="centroid-info">
+                                    <h4>📊 价格分组信息</h4>
+                                    <div class="iteration-info">
+                                        <span class="iteration-label">迭代轮数：</span>
+                                        <span class="iteration-count" id="priceIterationCount">0</span>
+                                    </div>
+                                    <div class="centroids-table" id="priceCentroidsTable">
+                                        <div class="table-header">
+                                            <span class="centroid-id">价格组</span>
+                                            <span class="centroid-coords">中心价格</span>
+                                            <span class="centroid-points">商品数量</span>
+                                        </div>
+                                        <div class="table-body" id="priceCentroidsTableBody">
+                                            <!-- 价格分组信息将在这里动态生成 -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-result" id="priceDemoResult" style="display: none;">
+                    <div class="result-message" id="priceDemoResultMessage"></div>
+                    <button class="next-page-btn" id="priceDemoNextPageBtn" onclick="goToNextPageFromPriceDemo()" style="display: none;">进入下一页 →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第一页：K-means聚类可视化演示 -->
+        <div class="page-container" id="page1" style="display: none;">
+            <div class="learning-section">
+                <h3>🎯 K-means聚类算法可视化演示</h3>
+                <p class="learning-description">通过交互式演示理解K-means聚类算法的核心原理：</p>
+                
+                <div class="clustering-demo-section">
+                    <div class="demo-controls">
+                        <div class="control-group">
+                            <h4>📊 数据点设置</h4>
+                                                            <div class="control-item">
+                                    <div class="control-left">
+                                        <label>坐标范围：</label>
+                                        <input type="number" id="coordRange" value="100" min="10" max="200">
+                                        <span>×</span>
+                                        <input type="number" id="coordRangeY" value="100" min="10" max="200">
+                                    </div>
+                                </div>
+                                                            <div class="control-item">
+                                    <div class="control-left">
+                                        <label>数据点数量：</label>
+                                        <input type="number" id="pointCount" value="20" min="5" max="50">
+                                    </div>
+                                </div>
+                                <div class="control-item">
+                                    <div class="control-left">
+                                        <label>手动添加点：</label>
+                                        <input type="number" id="manualX" placeholder="X坐标" min="0">
+                                        <input type="number" id="manualY" placeholder="Y坐标" min="0">
+                                    </div>
+                                    <div class="control-right">
+                                        <button class="add-btn" onclick="addManualPoint()">添加</button>
+                                        <button class="generate-btn" onclick="generateRandomPoints()">随机生成</button>
+                                    </div>
+                                </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h4>🎯 聚类设置</h4>
+                                                            <div class="control-item k-value-row">
+                                    <div class="control-left">
+                                        <label>K值：</label>
+                                        <input type="number" id="kValue" value="3" min="2" max="8">
+                                        <button class="init-btn" onclick="initializeCentroids()">初始化质心</button>
+                                    </div>
+                                </div>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label></label>
+                                </div>
+                                <div class="control-right">
+                                    <button class="start-btn" onclick="startClustering()">开始聚类</button>
+                                    <button class="next-btn" onclick="nextStep()">下一步</button>
+                                </div>
+                            </div>
+                            <div class="control-item">
+                                <div class="control-left">
+                                    <label></label>
+                                </div>
+                                <div class="control-right">
+                                    <button class="auto-btn" onclick="toggleAutoMode()">自动演示</button>
+                                    <button class="reset-demo-btn" onclick="resetDemo()">重置</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h4>📊 计算过程</h4>
+                            <div class="calculation-info" id="calculationInfo">
+                                <div class="current-point" id="currentPoint">等待开始...</div>
+                                <div class="distance-calc" id="distanceCalc"></div>
+                                <div class="cluster-assignment" id="clusterAssignment"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-visualization">
+                        <canvas id="clusteringCanvas" width="600" height="400"></canvas>
+                        <div class="canvas-info">
+                            <div class="step-info" id="stepInfo">准备开始聚类演示...</div>
+                            <div class="distance-formula">
+                                <h4>距离计算公式：</h4>
+                                <div class="latex-formula">
+                                    d(p₁, p₂) = √[(x₁-x₂)² + (y₁-y₂)²]
+                                </div>
+                                <p>其中 p₁(x₁,y₁) 和 p₂(x₂,y₂) 是两个数据点的坐标</p>
+                            </div>
+                            
+                            <div class="centroid-info">
+                                <h4>📊 质心信息</h4>
+                                <div class="iteration-info">
+                                    <span class="iteration-label">迭代轮数：</span>
+                                    <span class="iteration-count" id="iterationCount">0</span>
+                                </div>
+                                <div class="centroids-table" id="centroidsTable">
+                                    <div class="table-header">
+                                        <span class="centroid-id">聚类</span>
+                                        <span class="centroid-coords">坐标</span>
+                                        <span class="centroid-points">数据点</span>
+                                    </div>
+                                    <div class="table-body" id="centroidsTableBody">
+                                        <!-- 质心信息将在这里动态生成 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-result" id="demoResult" style="display: none;">
+                    <div class="result-message" id="demoResultMessage"></div>
+                    <button class="next-page-btn" id="demoNextPageBtn" onclick="goToNextPageFromDemo()" style="display: none;">进入下一页 →</button>
+                </div>
+                
+                <!-- 右下角图片 -->
+                <div class="page1-image">
+                    <img src="images/言言少年.png" alt="言言少年" class="corner-image" onclick="openCalculator()">
+                </div>
+                
+                <!-- 科学计算器模态框 -->
+                <div id="calculatorModal" class="calculator-modal">
+                    <div class="calculator-content">
+                        <div class="calculator-header">
+                            <h3>🧮 科学计算器</h3>
+                            <button class="calculator-close" onclick="closeCalculator()">×</button>
+                        </div>
+                        <div class="calculator-body">
+                            <div class="calculator-display">
+                                <input type="text" id="calculatorInput" readonly>
+                            </div>
+                            <div class="calculator-buttons">
+                                <!-- 科学函数按钮 -->
+                                <button class="calc-btn function-btn" onclick="addFunction('sin')">sin</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('cos')">cos</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('tan')">tan</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('log')">log</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('ln')">ln</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('sqrt')">√</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('pow')">x^y</button>
+                                <button class="calc-btn function-btn" onclick="addFunction('pi')">π</button>
+                                
+                                <!-- 数字和运算符 -->
+                                <button class="calc-btn" onclick="addToInput('7')">7</button>
+                                <button class="calc-btn" onclick="addToInput('8')">8</button>
+                                <button class="calc-btn" onclick="addToInput('9')">9</button>
+                                <button class="calc-btn operator-btn" onclick="addToInput('/')">/</button>
+                                
+                                <button class="calc-btn" onclick="addToInput('4')">4</button>
+                                <button class="calc-btn" onclick="addToInput('5')">5</button>
+                                <button class="calc-btn" onclick="addToInput('6')">6</button>
+                                <button class="calc-btn operator-btn" onclick="addToInput('*')">×</button>
+                                
+                                <button class="calc-btn" onclick="addToInput('1')">1</button>
+                                <button class="calc-btn" onclick="addToInput('2')">2</button>
+                                <button class="calc-btn" onclick="addToInput('3')">3</button>
+                                <button class="calc-btn operator-btn" onclick="addToInput('-')">-</button>
+                                
+                                <button class="calc-btn" onclick="addToInput('0')">0</button>
+                                <button class="calc-btn" onclick="addToInput('.')">.</button>
+                                <button class="calc-btn" onclick="calculate()">=</button>
+                                <button class="calc-btn operator-btn" onclick="addToInput('+')">+</button>
+                                
+                                <!-- 清除按钮 -->
+                                <button class="calc-btn clear-btn" onclick="clearInput()">C</button>
+                                <button class="calc-btn clear-btn" onclick="backspace()">⌫</button>
+                                <button class="calc-btn clear-btn" onclick="addToInput('(')">(</button>
+                                <button class="calc-btn clear-btn" onclick="addToInput(')')">)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二页：拖拽排序环节 -->
+        <div class="page-container" id="page2" style="display: none;">
+            <div class="learning-section">
+                <h3>🎓 K-means聚类算法图像压缩流程</h3>
+                
+                <!-- 拖拽排序环节 -->
+                <div class="drag-sort-section" id="dragSortSection">
+                    <h4>🎯 第一步：拖拽排序</h4>
+                    <p class="drag-description">请将以下6个步骤按正确的顺序拖拽排列，完成后点击"确认提交"：</p>
+                    
+                    <div class="drag-container">
+                        <div class="drag-slots">
+                            <div class="drag-slot" data-slot="1">
+                                <div class="slot-number">1</div>
+                                <div class="slot-placeholder">拖拽步骤到这里</div>
+                            </div>
+                            <div class="drag-slot" data-slot="2">
+                                <div class="slot-number">2</div>
+                                <div class="slot-placeholder">拖拽步骤到这里</div>
+                            </div>
+                            <div class="drag-slot" data-slot="3">
+                                <div class="slot-number">3</div>
+                                <div class="slot-placeholder">拖拽步骤到这里</div>
+                            </div>
+                            <div class="drag-slot" data-slot="4">
+                                <div class="slot-number">4</div>
+                                <div class="slot-placeholder">拖拽步骤到这里</div>
+                            </div>
+                            <div class="drag-slot" data-slot="5">
+                                <div class="slot-number">5</div>
+                                <div class="slot-placeholder">拖拽步骤到这里</div>
+                            </div>
+                            <div class="drag-slot" data-slot="6">
+                                <div class="slot-number">6</div>
+                                <div class="slot-placeholder">拖拽步骤到这里</div>
+                            </div>
+                        </div>
+                        
+                        <div class="drag-items">
+                            <div class="drag-item" draggable="true" data-step="1">
+                                <div class="item-content">
+                                    <div class="item-title">读取图像</div>
+                                    <div class="item-desc">cv2.imread() 读取图像文件</div>
+                                </div>
+                            </div>
+                            <div class="drag-item" draggable="true" data-step="2">
+                                <div class="item-content">
+                                    <div class="item-title">颜色转换</div>
+                                    <div class="item-desc">BGR → RGB 格式转换</div>
+                                </div>
+                            </div>
+                            <div class="drag-item" draggable="true" data-step="3">
+                                <div class="item-content">
+                                    <div class="item-title">数据重塑</div>
+                                    <div class="item-desc">3D图像 → 2D像素数组</div>
+                                </div>
+                            </div>
+                            <div class="drag-item" draggable="true" data-step="4">
+                                <div class="item-content">
+                                    <div class="item-title">K-means聚类</div>
+                                    <div class="item-desc">将像素按颜色相似性分组</div>
+                                </div>
+                            </div>
+                            <div class="drag-item" draggable="true" data-step="5">
+                                <div class="item-content">
+                                    <div class="item-title">获取聚类中心</div>
+                                    <div class="item-desc">提取K个代表颜色</div>
+                                </div>
+                            </div>
+                            <div class="drag-item" draggable="true" data-step="6">
+                                <div class="item-content">
+                                    <div class="item-title">重建图像</div>
+                                    <div class="item-desc">用聚类中心替换原始像素</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="drag-actions">
+                        <button class="submit-btn" onclick="submitDragSort()">确认提交</button>
+                        <button class="reset-btn" onclick="resetDragSort()">重新开始</button>
+                    </div>
+                    
+                    <div class="drag-result" id="dragResult" style="display: none;">
+                        <div class="result-message" id="resultMessage"></div>
+                        <div class="result-stars" id="resultStars"></div>
+                        <button class="next-page-btn" id="nextPageBtn" onclick="goToNextPage()" style="display: none;">进入下一页 →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三页：代码学习环节 -->
+        <div class="page-container" id="page3" style="display: none;">
+            <div class="learning-section">
+                <h3>🎓 K-means聚类算法图像压缩流程</h3>
+                
+                <p class="learning-description">通过填写以下代码中的关键参数，理解K-means聚类算法如何压缩图像：</p>
+            
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-title">Python K-means图像压缩核心代码</span>
+                    <div class="code-actions">
+                        <div class="flowchart-btn" onclick="toggleFlowchart()">📊 实现过程</div>
+                        <button class="answer-btn" onclick="showAnswer()">查看答案</button>
+                        <button class="run-btn" onclick="runNextStep()">运行下一步</button>
+                    </div>
+                </div>
+                
+                <!-- 流程图 -->
+                <div class="flowchart-container" id="flowchartContainer" style="display: none;">
+                    <div class="flowchart">
+                        <div class="flow-step clickable" onclick="showStepDetail(1)" title="点击查看详细说明">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">读取图像</div>
+                                <div class="step-desc">cv2.imread() 读取图像文件</div>
+                            </div>
+                            <div class="click-hint">👆 点击查看详情</div>
+                        </div>
+                        <div class="flow-arrow">↓</div>
+                        
+                        <div class="flow-step clickable" onclick="showStepDetail(2)" title="点击查看详细说明">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">颜色转换</div>
+                                <div class="step-desc">BGR → RGB 格式转换</div>
+                            </div>
+                            <div class="click-hint">👆 点击查看详情</div>
+                        </div>
+                        <div class="flow-arrow">↓</div>
+                        
+                        <div class="flow-step clickable" onclick="showStepDetail(3)" title="点击查看详细说明">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">数据重塑</div>
+                                <div class="step-desc">3D图像 → 2D像素数组</div>
+                            </div>
+                            <div class="click-hint">👆 点击查看详情</div>
+                        </div>
+                        <div class="flow-arrow">↓</div>
+                        
+                        <div class="flow-step clickable" onclick="showClusteringProcess()" title="点击查看K-means聚类详细流程">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">K-means聚类</div>
+                                <div class="step-desc">将像素按颜色相似性分组</div>
+                            </div>
+                            <div class="click-hint">👆 点击查看聚类算法</div>
+                        </div>
+                        <div class="flow-arrow">↓</div>
+                        
+                        <div class="flow-step clickable" onclick="showStepDetail(5)" title="点击查看详细说明">
+                            <div class="step-number">5</div>
+                            <div class="step-content">
+                                <div class="step-title">获取聚类中心</div>
+                                <div class="step-desc">提取K个代表颜色</div>
+                            </div>
+                            <div class="click-hint">👆 点击查看详情</div>
+                        </div>
+                        <div class="flow-arrow">↓</div>
+                        
+                        <div class="flow-step clickable" onclick="showStepDetail(6)" title="点击查看详细说明">
+                            <div class="step-number">6</div>
+                            <div class="step-content">
+                                <div class="step-title">重建图像</div>
+                                <div class="step-desc">用聚类中心替换原始像素</div>
+                            </div>
+                            <div class="click-hint">👆 点击查看详情</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="code-content-wrapper">
+                    <pre class="code-content python-highlight" id="pythonCode">
+<span class="keyword">import</span> <span class="module">numpy</span> <span class="keyword">as</span> <span class="alias">np</span>
+<span class="keyword">import</span> <span class="module">cv2</span>
+<span class="keyword">from</span> <span class="module">sklearn.cluster</span> <span class="keyword">import</span> <span class="class">KMeans</span>
+
+<span class="keyword">def</span> <span class="function">compress_image_with_kmeans</span>(<span class="parameter">image_path</span>, <span class="parameter">k</span>=<span class="number">16</span>):
+    <span class="comment">"""
+    K-means聚类算法压缩图像函数
+    
+    参数:
+        image_path: 输入图像文件路径
+        k: 聚类数量，决定压缩后图像的颜色数量
+    
+    返回:
+        compressed_image: 压缩后的图像数组
+    """</span>
+    
+    <span class="comment"># 步骤1: 读取图像文件</span>
+    <span class="variable">image</span> = <span class="function">cv2.imread</span>(<span class="parameter">image_path</span>)
+    <span class="comment"># 将BGR格式转换为RGB格式，因为OpenCV默认读取为BGR</span>
+    <span class="variable">image_rgb</span> = <span class="function">cv2.cvtColor</span>(<span class="variable">image</span>, <span class="constant">cv2.COLOR_BGR2RGB</span>)
+    
+    <span class="comment"># 步骤2: 重塑像素数据为聚类算法可处理的格式</span>
+    <span class="variable">height</span>, <span class="variable">width</span>, <span class="variable">channels</span> = <span class="variable">image_rgb</span>.<span class="attribute">shape</span>
+    <span class="comment"># 将3D图像数组重塑为2D数组，每行代表一个像素的RGB值</span>
+    <span class="variable">pixels</span> = <span class="variable">image_rgb</span>.<span class="function">reshape</span>(-<span class="number">1</span>, <span class="variable">channels</span>)
+    
+    <span class="comment"># 步骤3: 执行K-means聚类算法</span>
+    <span class="comment"># 创建KMeans对象，n_clusters参数决定最终的颜色数量</span>
+    <span class="variable">kmeans</span> = <span class="class">KMeans</span>(
+        n_clusters=<span class="fillable" data-param="k" contenteditable="true" data-correct="16" data-placeholder="___">___</span>,  <span class="comment"># 聚类数量，即压缩后的颜色数量</span>
+        random_state=<span class="number">42</span>,      <span class="comment"># 随机种子，确保结果可重现</span>
+        n_init=<span class="number">10</span>           <span class="comment"># 算法运行次数，取最佳结果</span>
+    )
+    <span class="comment"># 为每个像素分配聚类标签（0到k-1之间的整数）</span>
+    <span class="variable">labels</span> = <span class="variable">kmeans</span>.<span class="function">fit_predict</span>(<span class="variable">pixels</span>)
+    
+    <span class="comment"># 步骤4: 获取聚类中心（这些中心代表压缩后的颜色）</span>
+    <span class="comment"># cluster_centers_包含k个RGB颜色值，每个代表一个聚类</span>
+    <span class="variable">centers</span> = <span class="variable">kmeans</span>.<span class="attribute">cluster_centers_</span>.<span class="function">astype</span>(<span class="module">np</span>.<span class="attribute">uint8</span>)
+    
+    <span class="comment"># 步骤5: 重建压缩后的图像</span>
+    <span class="comment"># 用聚类中心替换原始像素值，实现颜色量化</span>
+    <span class="variable">compressed_pixels</span> = <span class="variable">centers</span>[<span class="variable">labels</span>]
+    <span class="comment"># 将2D数组重塑回原始图像尺寸</span>
+    <span class="variable">compressed_image</span> = <span class="variable">compressed_pixels</span>.<span class="function">reshape</span>(<span class="variable">height</span>, <span class="variable">width</span>, <span class="variable">channels</span>)
+    
+    <span class="keyword">return</span> <span class="variable">compressed_image</span>
+
+<span class="comment"># 使用示例：测试不同K值的压缩效果</span>
+<span class="comment"># K值越大，颜色越丰富，压缩比越小，质量越高</span>
+<span class="comment"># K值越小，颜色越少，压缩比越大，质量越低</span>
+<span class="variable">k_values</span> = [<span class="fillable" data-param="k1" contenteditable="true" data-correct="16" data-placeholder="__">__</span>, <span class="fillable" data-param="k2" contenteditable="true" data-correct="32" data-placeholder="__">__</span>, <span class="fillable" data-param="k3" contenteditable="true" data-correct="64" data-placeholder="__">__</span>, <span class="fillable" data-param="k4" contenteditable="true" data-correct="128" data-placeholder="__">__</span>, <span class="fillable" data-param="k5" contenteditable="true" data-correct="256" data-placeholder="__">__</span>]
+
+<span class="keyword">for</span> <span class="variable">k</span> <span class="keyword">in</span> <span class="variable">k_values</span>:
+    <span class="comment"># 对每个K值进行图像压缩</span>
+    <span class="variable">compressed</span> = <span class="function">compress_image_with_kmeans</span>(<span class="string">'image.jpg'</span>, <span class="variable">k</span>=<span class="variable">k</span>)
+    <span class="function">print</span>(<span class="string">f"K={k}: 使用 {k} 种颜色压缩图像"</span>)</pre>
+                </div>
+                
+                <div class="score-display" id="scoreDisplay" style="display: none;">
+                    <div class="stars" id="stars"></div>
+                    <div class="score-text" id="scoreText"></div>
+                    <button class="next-page-btn" id="nextPageBtn2" onclick="goToPage3()" style="display: none;">进入实践环节 →</button>
+                </div>
+            </div>
+            
+            <div class="parameter-explanation">
+                <h4>📝 关键参数说明：</h4>
+                <ul>
+                    <li><strong>n_clusters</strong>: 聚类数量，决定压缩后图像的颜色数量</li>
+                    <li><strong>k_values</strong>: 不同的K值会产生不同的压缩效果</li>
+                    <li><strong>K值越大</strong>: 颜色越丰富，压缩比越小，质量越高</li>
+                    <li><strong>K值越小</strong>: 颜色越少，压缩比越大，质量越低</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第四页：图片上传和聚类压缩实践 -->
+    <div class="page-container" id="page4" style="display: none;">
+        <div class="learning-section">
+            <h3>🎯 K-means聚类图像压缩实践</h3>
+            <p class="learning-description">现在让我们上传一张图片，体验K-means聚类算法的实际压缩效果：</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">点击或拖拽上传图片</div>
+                <div class="upload-hint">支持 JPG、PNG、GIF 格式</div>
+            </div>
+            <div class="size-warning">
+                ⚠️ 建议图片尺寸不超过 800×600 像素，以确保处理速度
+            </div>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>正在处理图片...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <div class="compression-results" id="compressionResults">
+                <!-- 原始图片和压缩结果将在这里显示 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片放大模态框 -->
+    <div id="imageModal" class="modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="comparison-container" id="comparisonContainer" style="display: none;">
+                <div class="comparison-item">
+                    <div class="comparison-label">原始图片</div>
+                    <img class="modal-image" id="originalModalImage">
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-label" id="compressedLabel">压缩图片</div>
+                    <img class="modal-image" id="compressedModalImage">
+                </div>
+            </div>
+            <img class="modal-image" id="modalImage">
+        </div>
+    </div>
+
+    <!-- 步骤详情模态框 -->
+    <div id="stepDetailModal" class="modal">
+        <span class="modal-close" onclick="closeStepDetailModal()">&times;</span>
+        <div class="modal-content step-detail-content">
+            <div class="modal-title" id="stepDetailTitle"></div>
+            <div class="step-detail-body" id="stepDetailBody"></div>
+        </div>
+    </div>
+
+    <!-- K-means聚类计算流程模态框 -->
+    <div id="clusteringModal" class="modal">
+        <span class="modal-close" onclick="closeClusteringModal()">&times;</span>
+        <div class="modal-content clustering-modal-content">
+            <div class="modal-title">🔬 K-means聚类算法详细流程</div>
+            <div class="clustering-process">
+                <div class="process-step">
+                    <div class="process-number">1</div>
+                    <div class="process-content">
+                        <h4>初始化聚类中心</h4>
+                        <p>随机选择K个像素点作为初始聚类中心</p>
+                        <div class="code-example">
+                            <code>centers = random_select(pixels, k)</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="process-step highlighted" style="position: relative;">
+                    <div class="star-badge">⭐</div>
+                    <div class="process-number">2</div>
+                    <div class="process-content">
+                        <h4>计算距离</h4>
+                        <p>计算每个像素到所有聚类中心的欧几里得距离</p>
+                        <div class="code-example">
+                            <code>distance = √[(R₁-R₂)² + (G₁-G₂)² + (B₁-B₂)²]</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="process-step">
+                    <div class="process-number">3</div>
+                    <div class="process-content">
+                        <h4>分配像素</h4>
+                        <p>将每个像素分配给距离最近的聚类中心</p>
+                        <div class="code-example">
+                            <code>labels[i] = argmin(distance(pixel[i], centers))</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="process-step">
+                    <div class="process-number">4</div>
+                    <div class="process-content">
+                        <h4>更新聚类中心</h4>
+                        <p>重新计算每个聚类的中心点（平均值）</p>
+                        <div class="code-example">
+                            <code>centers[j] = mean(pixels where labels == j)</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="process-step">
+                    <div class="process-number">5</div>
+                    <div class="process-content">
+                        <h4>迭代优化</h4>
+                        <p>重复步骤2-4，直到聚类中心不再变化或达到最大迭代次数</p>
+                        <div class="code-example">
+                            <code>while not converged and iterations < max_iter:</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="process-step">
+                    <div class="process-number">6</div>
+                    <div class="process-content">
+                        <h4>输出结果</h4>
+                        <p>返回最终的聚类中心（代表颜色）和像素标签</p>
+                        <div class="code-example">
+                            <code>return centers, labels</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="clustering-visualization">
+                <h4>🎨 可视化示例 (K=3)</h4>
+                <div class="color-clusters">
+                    <div class="cluster-item">
+                        <div class="cluster-color" style="background: #ff6b6b;"></div>
+                        <div class="cluster-info">
+                            <div class="cluster-label">聚类1</div>
+                            <div class="cluster-rgb">RGB(255, 107, 107)</div>
+                        </div>
+                    </div>
+                    <div class="cluster-item">
+                        <div class="cluster-color" style="background: #4ecdc4;"></div>
+                        <div class="cluster-info">
+                            <div class="cluster-label">聚类2</div>
+                            <div class="cluster-rgb">RGB(78, 205, 196)</div>
+                        </div>
+                    </div>
+                    <div class="cluster-item">
+                        <div class="cluster-color" style="background: #45b7d1;"></div>
+                        <div class="cluster-info">
+                            <div class="cluster-label">聚类3</div>
+                            <div class="cluster-rgb">RGB(69, 183, 209)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

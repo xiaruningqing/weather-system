@@ -47,12 +47,12 @@ export default function PresetMarker({ marker }) {
       return '#64748b' // 已占用显示灰色
     }
     const colorMap = {
-      satellite: '#93c5fd', // 淡蓝色
-      ground: '#86efac',     // 淡绿色
-      radar: '#fdba74',      // 淡橙色
-      buoy: '#c4b5fd'        // 淡紫色
+      satellite: '#3b82f6', // 更亮的蓝色
+      ground: '#10b981',     // 更亮的绿色
+      radar: '#f59e0b',      // 更亮的橙色
+      buoy: '#8b5cf6'        // 更亮的紫色
     }
-    return colorMap[type] || '#93c5fd'
+    return colorMap[type] || '#3b82f6'
   }
   
   const getMarkerColor = (type, occupied) => {
@@ -60,12 +60,12 @@ export default function PresetMarker({ marker }) {
       return 'border-slate-500 bg-slate-500/10'
     }
     const colorMap = {
-      satellite: 'border-blue-300 bg-blue-300/20',
-      ground: 'border-green-300 bg-green-300/20',
-      radar: 'border-orange-300 bg-orange-300/20',
-      buoy: 'border-purple-300 bg-purple-300/20'
+      satellite: 'border-blue-400 bg-blue-400/60',
+      ground: 'border-green-400 bg-green-400/60',
+      radar: 'border-orange-400 bg-orange-400/60',
+      buoy: 'border-purple-400 bg-purple-400/60'
     }
-    return colorMap[type] || 'border-blue-300 bg-blue-300/20'
+    return colorMap[type] || 'border-blue-400 bg-blue-400/60'
   }
   
   const pulseScale = 1 + Math.sin(pulsePhase) * 0.15 // 轻微的脉动
@@ -77,8 +77,8 @@ export default function PresetMarker({ marker }) {
         left: `${x}%`, 
         top: `${y}%`,
         zIndex: marker.key === 'satellite' ? 8 : 5, // 低于实际传感器的层级
-        transform: marker.key === 'satellite' ? 'translate(-50%, -50%) scale(1.1)' : 'translate(-50%, -50%)',
-        opacity: isOccupied ? 0.3 : 0.7 // 已占用的位置显示更淡
+        transform: marker.key === 'satellite' ? 'translate(-50%, -50%) scale(1.2)' : 'translate(-50%, -50%) scale(1.1)',
+        opacity: isOccupied ? 0.4 : 0.95 // 大幅提升可见性
       }}
     >
       {/* 主体图标 - 虚线样式 */}
@@ -89,61 +89,64 @@ export default function PresetMarker({ marker }) {
             const iconColor = getIconColor(sensorType, isOccupied)
             return (
               <IconComponent 
-                size={16} 
+                size={24} 
                 color={iconColor}
                 style={{ 
-                  filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.3))',
-                  opacity: 0.8
+                  filter: `drop-shadow(0 0 10px ${iconColor}) drop-shadow(0 0 20px ${iconColor}) drop-shadow(0 0 6px rgba(0,0,0,0.8))`,
+                  opacity: 1,
+                  fontWeight: 'bold'
                 }}
               />
             )
           })()} 
         </div>
         
-        {/* 预设位置的虚线圈 */}
+        {/* 预设位置的强化虚线圈 */}
         <div 
-          className={`absolute rounded-full border-2 ${getMarkerColor(sensorType, isOccupied)} -z-10`}
+          className={`absolute rounded-full border-4 ${getMarkerColor(sensorType, isOccupied)} -z-10`}
           style={{
-            width: '32px',
-            height: '32px',
+            width: '40px',
+            height: '40px',
             left: '50%',
             top: '50%',
             transform: `translate(-50%, -50%) scale(${pulseScale})`,
             borderStyle: 'dashed',
-            opacity: isOccupied ? 0.2 : 0.6
+            opacity: isOccupied ? 0.3 : 0.9,
+            boxShadow: `0 0 15px ${getIconColor(sensorType, isOccupied)}80, 0 0 30px ${getIconColor(sensorType, isOccupied)}50`
           }}
         ></div>
         
-        {/* 外层的缓和提示圈 */}
+        {/* 外层的强化提示圈 */}
         {!isOccupied && (
           <div 
-            className={`absolute rounded-full border ${getMarkerColor(sensorType, isOccupied).split(' ')[0]}`}
+            className={`absolute rounded-full border-2 ${getMarkerColor(sensorType, isOccupied).split(' ')[0]}`}
             style={{
-              width: '48px',
-              height: '48px',
+              width: '60px',
+              height: '60px',
               left: '50%',
               top: '50%',
               transform: 'translate(-50%, -50%)',
               borderStyle: 'dotted',
-              opacity: 0.3 + Math.sin(pulsePhase * 2) * 0.2
+              opacity: 0.6 + Math.sin(pulsePhase * 2) * 0.3,
+              boxShadow: `0 0 20px ${getIconColor(sensorType, isOccupied)}60`
             }}
           ></div>
         )}
         
         {/* 位置名称标签 */}
         <div 
-          className="absolute text-xs whitespace-nowrap pointer-events-none"
+          className="absolute text-sm whitespace-nowrap pointer-events-none"
           style={{
             left: marker.key === 'satellite' ? '120%' : '120%',
             top: '50%',
             transform: 'translateY(-50%)',
             color: getIconColor(sensorType, isOccupied),
-            textShadow: '0 0 4px rgba(0,0,0,0.8)',
-            opacity: isOccupied ? 0.4 : 0.8
+            textShadow: `0 0 8px rgba(0,0,0,1), 0 0 4px ${getIconColor(sensorType, isOccupied)}`,
+            opacity: isOccupied ? 0.5 : 0.95
           }}
         >
-          <div className="font-medium">{marker.name}</div>
-          <div className="text-[10px] opacity-70">{marker.description}</div>
+          <div className="font-bold">{marker.name}</div>
+          <div className="text-xs opacity-80">{marker.description}</div>
         </div>
         
         {/* 拖放提示箭头 */}
@@ -152,16 +155,16 @@ export default function PresetMarker({ marker }) {
             className="absolute"
             style={{
               left: '50%',
-              top: '-30px',
+              top: '-35px',
               transform: 'translateX(-50%)',
-              opacity: 0.4 + Math.sin(pulsePhase * 3) * 0.3
+              opacity: 0.7 + Math.sin(pulsePhase * 3) * 0.3
             }}
           >
             <div 
-              className="text-xs"
+              className="text-lg font-bold"
               style={{
                 color: getIconColor(sensorType, isOccupied),
-                textShadow: '0 0 4px rgba(0,0,0,0.8)'
+                textShadow: `0 0 10px rgba(0,0,0,1), 0 0 6px ${getIconColor(sensorType, isOccupied)}`
               }}
             >
               ↓
@@ -172,15 +175,16 @@ export default function PresetMarker({ marker }) {
         {/* 卫星轨道指示 */}
         {marker.key === 'satellite' && !isOccupied && (
           <div 
-            className="absolute rounded-full border border-blue-300/20"
+            className="absolute rounded-full border-2 border-blue-400/60"
             style={{
-              width: '120px',
-              height: '120px',
+              width: '140px',
+              height: '140px',
               left: '50%',
               top: '50%',
               transform: 'translate(-50%, -50%)',
               borderStyle: 'dashed',
-              opacity: 0.3 + Math.sin(pulsePhase * 0.5) * 0.1
+              opacity: 0.6 + Math.sin(pulsePhase * 0.5) * 0.2,
+              boxShadow: `0 0 25px #3b82f680`
             }}
           ></div>
         )}

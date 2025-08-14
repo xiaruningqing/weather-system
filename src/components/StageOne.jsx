@@ -135,6 +135,12 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
       const dataQuality = randomInt(85, 98) // 随机生成85%到98%的数据质量
       setDevicesState((prev) => ({ ...prev, [key]: { status: 'done', data: generated, dataQuality } }))
       setMarkers((arr) => arr.map((m) => (m.id === id ? { ...m, done: true } : m)))
+      
+      // 自动显示采集完成的传感器数据
+      setTimeout(() => {
+        setOpenKey(key)
+        setHighlightKey(key)
+      }, 500) // 延迟500ms显示数据，让用户看到采集完成的动画
     }, duration)
   }
 
@@ -1371,12 +1377,12 @@ function Marker2D({ marker, devicesState }) {
   
   const getMarkerColor = (type) => {
     const colorMap = {
-      satellite: 'border-blue-400 bg-blue-400/20',
-      ground: 'border-green-400 bg-green-400/20',
-      radar: 'border-orange-400 bg-orange-400/20',
-      buoy: 'border-purple-400 bg-purple-400/20'
+      satellite: 'border-blue-400 bg-blue-400/80',
+      ground: 'border-green-400 bg-green-400/80',
+      radar: 'border-orange-400 bg-orange-400/80',
+      buoy: 'border-purple-400 bg-purple-400/80'
     }
-    return colorMap[type] || 'border-cyan-400 bg-cyan-400/20'
+    return colorMap[type] || 'border-cyan-400 bg-cyan-400/80'
   }
   
   const pulseScale = 1 + Math.sin(pulsePhase) * 0.3
@@ -1406,55 +1412,87 @@ function Marker2D({ marker, devicesState }) {
       }}
     >
       {/* 主体图标 */}
-              <div 
-          className={`relative text-2xl ${getIconAnimation(sensorType)}`}
+      <div 
+        className={`relative text-2xl ${getIconAnimation(sensorType)}`}
+        style={{
+          // 移除特殊动画，统一使用闪烁效果
+          transform: 'none'
+        }}
+      >
+        {/* 图标背景增强 */}
+        <div 
+          className={`absolute rounded-full ${getMarkerColor(sensorType)} border-2`}
           style={{
-            // 移除特殊动画，统一使用闪烁效果
-            transform: 'none'
+            width: '32px',
+            height: '32px',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            opacity: 0.85,
+            boxShadow: `0 0 15px ${getIconColor(sensorType)}80, 0 0 30px ${getIconColor(sensorType)}50`
           }}
-        >
-        <div className="flex items-center justify-center">
+        ></div>
+        
+        {/* 白色背景圈增强对比度 */}
+        <div 
+          className="absolute rounded-full bg-white/70 border border-white/80"
+          style={{
+            width: '28px',
+            height: '28px',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 5
+          }}
+        ></div>
+        
+        <div className="relative flex items-center justify-center z-10">
           {(() => {
             const IconComponent = getMarkerIcon(sensorType)
             const iconColor = getIconColor(sensorType)
             return (
               <IconComponent 
-                size={20} 
+                size={24} 
                 color={iconColor}
-                style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.5))' }}
+                style={{ 
+                  filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(255,255,255,0.6))',
+                  fontWeight: 'bold',
+                  stroke: '#ffffff',
+                  strokeWidth: '0.5px'
+                }}
               />
             )
           })()}
         </div>
         
-
-        
-        {/* 简化闪烁辐射效果 */}
+        {/* 增强的闪烁辐射效果 */}
         {isActive && (
           <>
             {/* 内层闪烁圈 */}
             <div 
               className={`absolute rounded-full border-2 ${getMarkerColor(sensorType).split(' ')[0]} animate-pulse`}
               style={{
-                width: '50px',
-                height: '50px',
+                width: '45px',
+                height: '45px',
                 left: '50%',
                 top: '50%',
                 transform: 'translate(-50%, -50%)',
-                opacity: 0.8 + Math.sin(pulsePhase * 2) * 0.2
+                opacity: 0.9,
+                boxShadow: `0 0 20px ${getIconColor(sensorType)}, 0 0 40px ${getIconColor(sensorType)}70`
               }}
             ></div>
             
             {/* 中层辐射圈 */}
             <div 
-              className={`absolute rounded-full border ${getMarkerColor(sensorType).split(' ')[0]}`}
+              className={`absolute rounded-full border-2 ${getMarkerColor(sensorType).split(' ')[0]}`}
               style={{
-                width: '70px',
-                height: '70px',
+                width: '60px',
+                height: '60px',
                 left: '50%',
                 top: '50%',
-                transform: `translate(-50%, -50%) scale(${1 + Math.sin(pulsePhase * 1.5) * 0.3})`,
-                opacity: 0.6 - Math.sin(pulsePhase * 1.5) * 0.2
+                transform: `translate(-50%, -50%) scale(${1 + Math.sin(pulsePhase * 1.5) * 0.2})`,
+                opacity: 0.7 - Math.sin(pulsePhase * 1.5) * 0.2,
+                boxShadow: `0 0 25px ${getIconColor(sensorType)}70`
               }}
             ></div>
             
@@ -1462,12 +1500,13 @@ function Marker2D({ marker, devicesState }) {
             <div 
               className={`absolute rounded-full border ${getMarkerColor(sensorType).split(' ')[0]}`}
               style={{
-                width: '90px',
-                height: '90px',
+                width: '75px',
+                height: '75px',
                 left: '50%',
                 top: '50%',
-                transform: `translate(-50%, -50%) scale(${1 + Math.sin(pulsePhase + 1) * 0.4})`,
-                opacity: 0.4 - Math.sin(pulsePhase + 1) * 0.2
+                transform: `translate(-50%, -50%) scale(${1 + Math.sin(pulsePhase + 1) * 0.3})`,
+                opacity: 0.5 - Math.sin(pulsePhase + 1) * 0.2,
+                boxShadow: `0 0 30px ${getIconColor(sensorType)}50`
               }}
             ></div>
             
@@ -1480,14 +1519,15 @@ function Marker2D({ marker, devicesState }) {
                 left: '50%',
                 top: '50%',
                 transform: 'translate(-50%, -50%)',
-                opacity: 0.9 + Math.sin(pulsePhase * 4) * 0.1,
-                boxShadow: `0 0 10px ${getIconColor(sensorType)}80`
+                opacity: 1,
+                zIndex: 30,
+                boxShadow: `0 0 15px ${getIconColor(sensorType)}, 0 0 30px ${getIconColor(sensorType)}, 0 0 45px ${getIconColor(sensorType)}50`
               }}
             ></div>
           </>
         )}
         
-                  {/* 统一数据传输线 */}
+        {/* 统一数据传输线 */}
         {isActive && (
           <>
             <div 
