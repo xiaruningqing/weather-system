@@ -98,24 +98,17 @@ export default function App() {
           />
         </div>
 
-        <div className="mt-4">
-          <SettingsBar
-            isAutoPlay={isAutoPlay}
-            onToggleAutoPlay={() => setIsAutoPlay((v) => !v)}
-            speedFactor={speedFactor}
-            onChangeSpeed={setSpeedFactor}
-            showParticles={showParticles}
-            onToggleParticles={() => setShowParticles((v) => !v)}
-          />
-        </div>
 
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-slate-300">传统与数智系统对比</div>
-            <PDFSummaryButton selector="main" />
+
+        {currentStage === 4 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-slate-300">传统与数智系统对比</div>
+              <PDFSummaryButton selector="main" />
+            </div>
+            <ComparisonTable />
           </div>
-          <ComparisonTable />
-        </div>
+        )}
       </main>
     </div>
     </GlobalProvider>

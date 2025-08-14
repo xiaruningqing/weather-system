@@ -8,6 +8,7 @@ import { MdHome, MdRadar } from 'react-icons/md'
 import { useGlobal } from '../store/global.jsx'
 import { Info } from 'lucide-react'
 import UISensorCard from './ui/SensorCard.jsx'
+import { PresetMarkers } from './PresetMarker.jsx'
 
 const WIND_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 
@@ -16,6 +17,14 @@ function randomPick(list) { return list[Math.floor(Math.random() * list.length)]
 
 function useAllDone(devicesState) {
   return useMemo(() => Object.values(devicesState).every((d) => d.status === 'done'), [devicesState])
+}
+
+// 预设传感器位置（地面站、雷达、浮标在地球表面，卫星在轨道）
+const PRESET_POSITIONS = {
+  satellite: { x: 80, y: 20, z: 1.5, name: '卫星轨道', description: '低地球轨道' }, // 卫星在轨道上
+  ground: { x: 65, y: 45, z: 1.0, name: '地面站', description: '气象观测站' }, // 地面站在陆地
+  radar: { x: 40, y: 35, z: 1.0, name: '雷达站', description: '多普勒雷达' }, // 雷达在内陆
+  buoy: { x: 25, y: 70, z: 1.0, name: '海洋浮标', description: '深海观测点' }, // 浮标在海洋
 }
 
 export default function StageOne({ onComplete, isPaused, isAutoPlay = true, speedFactor = 1 }) {
@@ -27,7 +36,7 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
     buoy: { status: 'idle', data: null },
   })
   const [openKey, setOpenKey] = useState(null)
-  const [score, setScore] = useState(0)
+
   const [markers, setMarkers] = useState([]) // {x,y,key,id,done}
   const [dragOrigin, setDragOrigin] = useState(null) // {x,y} from sensor card
   const [hoverWorld, setHoverWorld] = useState(null) // {x,y,z}
@@ -36,7 +45,7 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
   const hasCompletedRef = useRef(false)
   const allDone = useAllDone(devicesState)
 
-  useEffect(() => { setStageOneScore(score) }, [score, setStageOneScore])
+
 
   useEffect(() => {
     if (allDone && !hasCompletedRef.current) {
@@ -48,28 +57,84 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
     }
   }, [allDone, isAutoPlay, onComplete, speedFactor])
 
+
+
+  // 根据传感器类型生成对应的数据
+  const generateSensorData = (sensorType) => {
+    switch(sensorType) {
+      case 'satellite':
+        return {
+          cloudCoverage: randomInt(0, 100),
+          cloudTopTemp: randomInt(-80, 20),
+          waterVapor: randomInt(0, 70),
+          surfaceTemp: randomInt(-50, 60),
+          solarRadiation: randomInt(0, 1400),
+          atmosphericTopTemp: randomInt(-80, -20)
+        }
+      case 'ground':
+        return {
+          airTemperature: randomInt(-40, 50),
+          relativeHumidity: randomInt(0, 100),
+          atmosphericPressure: randomInt(800, 1100),
+          windSpeed: randomInt(0, 30),
+          windDirection: randomPick(WIND_DIRECTIONS),
+          precipitation: randomInt(0, 200) / 10,
+          visibility: randomInt(1, 500) / 10
+        }
+      case 'radar':
+        return {
+          precipitationIntensity: randomInt(0, 300) / 10,
+          radarReflectivity: randomInt(0, 80),
+          radialVelocity: randomInt(-50, 50),
+          echoTopHeight: randomInt(0, 200) / 10,
+          verticalLiquidWater: randomInt(0, 80),
+          windFieldIntensity: randomInt(0, 50)
+        }
+      case 'buoy':
+        return {
+          seaSurfaceTemp: randomInt(-20, 350) / 10,
+          waveHeight: randomInt(0, 150) / 10,
+          wavePeriod: randomInt(20, 250) / 10,
+          oceanCurrentSpeed: randomInt(0, 30) / 10,
+          salinity: randomInt(300, 400) / 10,
+          seaSurfaceWind: randomInt(0, 40)
+        }
+      default:
+        return {
+          temperatureC: randomInt(10, 34),
+          humidityPct: randomInt(20, 95),
+          pressureHpa: randomInt(985, 1035)
+        }
+    }
+  }
+
   const startCollectAt = (key, xPct, yPct) => {
     setDevicesState((prev) => {
       if (prev[key]?.status !== 'idle') return prev
       return { ...prev, [key]: { ...prev[key], status: 'collecting' } }
     })
     const id = `${key}-${Date.now()}`
-    setMarkers((arr) => [...arr, { x: xPct, y: yPct, key, id, done: false }])
+    
+    // 使用预设位置或用户投放位置
+    const position = PRESET_POSITIONS[key] ? 
+      { x: PRESET_POSITIONS[key].x, y: PRESET_POSITIONS[key].y } : 
+      { x: xPct, y: yPct }
+    
+    setMarkers((arr) => [...arr, { 
+      x: position.x, 
+      y: position.y, 
+      key, 
+      id, 
+      done: false,
+      isOrbital: key === 'satellite' // 标记卫星为轨道传感器
+    }])
 
     const duration = 1200 + randomInt(0, 800)
     setTimeout(() => {
-      const generated = {
-        temperatureC: randomInt(10, 34),
-        humidityPct: randomInt(20, 95),
-        pressureHpa: randomInt(985, 1035),
-        windSpeed: randomInt(0, 18),
-        windDir: randomPick(WIND_DIRECTIONS),
-        cloudPct: randomInt(0, 100),
-        rainMm: randomInt(0, 8) / 10,
-      }
-      setDevicesState((prev) => ({ ...prev, [key]: { status: 'done', data: generated } }))
+      const generated = generateSensorData(key)
+      const dataQuality = randomInt(85, 98) // 随机生成85%到98%的数据质量
+      setDevicesState((prev) => ({ ...prev, [key]: { status: 'done', data: generated, dataQuality } }))
       setMarkers((arr) => arr.map((m) => (m.id === id ? { ...m, done: true } : m)))
-      setScore((s) => s + 10)
     }, duration)
   }
 
@@ -78,21 +143,34 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
     if (openKey && devicesState[openKey]?.status === 'done') setHighlightKey(openKey)
   }, [openKey, devicesState])
 
+  // 监听地球上传感器点击事件
+  useEffect(() => {
+    const handleSensorClick = (event) => {
+      const { sensorType } = event.detail
+      if (devicesState[sensorType]?.status === 'done') {
+        setOpenKey(openKey === sensorType ? null : sensorType)
+      }
+    }
+    
+    window.addEventListener('openSensorData', handleSensorClick)
+    return () => window.removeEventListener('openSensorData', handleSensorClick)
+  }, [openKey, devicesState])
+
   return (
     <section className="min-h-[520px]">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl md:text-2xl font-semibold">阶段一 · 多源感知</h2>
-          <p className="mt-1 text-slate-300">右侧拖拽传感器到左侧地球采集数据，点击地球上的图标卡片查看数据</p>
+          <p className="mt-1 text-slate-300">拖拽右侧传感器到左侧地球对应的虚线位置采集数据，点击已放置的传感器查看数据</p>
         </div>
         <div className="text-sm text-slate-300 flex items-center gap-3">
           <span>进度</span>
           <div className="w-40 h-2 rounded bg-slate-800 overflow-hidden"><div className="h-full bg-sky-400" style={{ width: `${(progress/4)*100}%` }} /></div>
           <span className="text-sky-300">{progress}/4</span>
-          <span className="ml-4">得分 <span className="text-amber-300 font-semibold">{score}</span></span>
+
           <button
             className="ml-2 px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700"
-            onClick={() => { setDevicesState({ satellite:{status:'idle',data:null}, ground:{status:'idle',data:null}, radar:{status:'idle',data:null}, buoy:{status:'idle',data:null} }); setMarkers([]); setScore(0); setOpenKey(null); hasCompletedRef.current = false; }}
+            onClick={() => { setDevicesState({ satellite:{status:'idle',data:null,dataQuality:null}, ground:{status:'idle',data:null,dataQuality:null}, radar:{status:'idle',data:null,dataQuality:null}, buoy:{status:'idle',data:null,dataQuality:null} }); setMarkers([]); setOpenKey(null); hasCompletedRef.current = false; }}
           >重置</button>
         </div>
       </div>
@@ -157,12 +235,103 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
                 <UISensorCard id="buoy" type="buoy" title="浮标" status={devicesState.buoy.status==='idle'?'idle':devicesState.buoy.status} desc={devicesState.buoy.status==='done'?'已完成，点击查看数据':devicesState.buoy.status==='collecting'?'采集中…':'拖到地球开始采集'} onClick={(id)=>setOpenKey(openKey===id?null:id)} onStatusClick={(id)=>setOpenKey(openKey===id?null:id)} />
               </div>
             </div>
-            <div className="mt-4 space-y-2">
-              <DataBlock title="温度" value={mergeMetric(devicesState, 'temperatureC', (v)=>`${v}°C`)} />
-              <DataBlock title="湿度" value={mergeMetric(devicesState, 'humidityPct', (v)=>`${v}%`)} />
-              <DataBlock title="气压" value={mergeMetric(devicesState, 'pressureHpa', (v)=>`${v}hPa`)} />
-              <DataBlock title="能见度" value={mergeMetric(devicesState, 'visibilityKm', (v)=>`${v||3.2}km`, true)} />
-              <DataBlock title="降水" value={mergeMetric(devicesState, 'rainMm', (v)=>`${v||4.1}mm`, true)} />
+            {/* 传感器数据详情区域 */}
+            <div className="mt-4">
+              {openKey && devicesState[openKey]?.status === 'done' ? (
+                <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-2 rounded-lg ${openKey === 'satellite' ? 'bg-blue-500/20' : openKey === 'ground' ? 'bg-green-500/20' : openKey === 'radar' ? 'bg-orange-500/20' : 'bg-purple-500/20'}`}>
+                        {(() => {
+                          const icons = {
+                            satellite: <FaSatellite className="text-blue-400" size={16} />,
+                            ground: <MdHome className="text-green-400" size={16} />,
+                            radar: <MdRadar className="text-orange-400" size={16} />,
+                            buoy: <FaShip className="text-purple-400" size={16} />
+                          }
+                          return icons[openKey]
+                        })()}
+                      </div>
+                      <span className="text-sky-300 font-semibold">
+                        {openKey === 'satellite' ? '卫星' : openKey === 'ground' ? '地面站' : openKey === 'radar' ? '雷达' : '浮标'}数据详情
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => setOpenKey(null)}
+                      className="text-slate-400 hover:text-white transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* 根据传感器类型显示不同数据 */}
+                    {openKey === 'satellite' && devicesState[openKey]?.data && (
+                      <>
+                        <DetailDataItem label="云量" value={`${devicesState[openKey].data?.cloudCoverage || '--'}%`} icon="☁️" />
+                        <DetailDataItem label="云顶温度" value={`${devicesState[openKey].data?.cloudTopTemp || '--'}°C`} icon="🌡️" />
+                        <DetailDataItem label="水汽含量" value={`${devicesState[openKey].data?.waterVapor || '--'}mm`} icon="💧" />
+                        <DetailDataItem label="地表温度" value={`${devicesState[openKey].data?.surfaceTemp || '--'}°C`} icon="🌍" />
+                        <DetailDataItem label="太阳辐射" value={`${devicesState[openKey].data?.solarRadiation || '--'}W/m²`} icon="☀️" />
+                        <DetailDataItem label="大气顶温度" value={`${devicesState[openKey].data?.atmosphericTopTemp || '--'}°C`} icon="🌌" />
+                      </>
+                    )}
+                    {openKey === 'ground' && devicesState[openKey]?.data && (
+                      <>
+                        <DetailDataItem label="气温" value={`${devicesState[openKey].data?.airTemperature || '--'}°C`} icon="🌡️" />
+                        <DetailDataItem label="相对湿度" value={`${devicesState[openKey].data?.relativeHumidity || '--'}%`} icon="💧" />
+                        <DetailDataItem label="大气压力" value={`${devicesState[openKey].data?.atmosphericPressure || '--'}hPa`} icon="📊" />
+                        <DetailDataItem label="风速" value={`${devicesState[openKey].data?.windSpeed || '--'}m/s`} icon="🌪️" />
+                        <DetailDataItem label="风向" value={devicesState[openKey].data?.windDirection || '--'} icon="🧭" />
+                        <DetailDataItem label="降水量" value={`${devicesState[openKey].data?.precipitation || '--'}mm/h`} icon="🌧️" />
+                        <DetailDataItem label="能见度" value={`${devicesState[openKey].data?.visibility || '--'}km`} icon="👁️" />
+                      </>
+                    )}
+                    {openKey === 'radar' && devicesState[openKey]?.data && (
+                      <>
+                        <DetailDataItem label="降水强度" value={`${devicesState[openKey].data?.precipitationIntensity || '--'}mm/h`} icon="🌧️" />
+                        <DetailDataItem label="雷达反射率" value={`${devicesState[openKey].data?.radarReflectivity || '--'}dBZ`} icon="📡" />
+                        <DetailDataItem label="径向速度" value={`${devicesState[openKey].data?.radialVelocity || '--'}m/s`} icon="🔄" />
+                        <DetailDataItem label="回波顶高" value={`${devicesState[openKey].data?.echoTopHeight || '--'}km`} icon="📏" />
+                        <DetailDataItem label="液态水含量" value={`${devicesState[openKey].data?.verticalLiquidWater || '--'}kg/m²`} icon="💧" />
+                        <DetailDataItem label="风场强度" value={`${devicesState[openKey].data?.windFieldIntensity || '--'}m/s`} icon="🌪️" />
+                      </>
+                    )}
+                    {openKey === 'buoy' && devicesState[openKey]?.data && (
+                      <>
+                        <DetailDataItem label="海表温度" value={`${devicesState[openKey].data?.seaSurfaceTemp || '--'}°C`} icon="🌊" />
+                        <DetailDataItem label="波高" value={`${devicesState[openKey].data?.waveHeight || '--'}m`} icon="🌊" />
+                        <DetailDataItem label="波周期" value={`${devicesState[openKey].data?.wavePeriod || '--'}s`} icon="⏱️" />
+                        <DetailDataItem label="海流速度" value={`${devicesState[openKey].data?.oceanCurrentSpeed || '--'}m/s`} icon="🌊" />
+                        <DetailDataItem label="海水盐度" value={`${devicesState[openKey].data?.salinity || '--'}ppt`} icon="🧂" />
+                        <DetailDataItem label="海面风速" value={`${devicesState[openKey].data?.seaSurfaceWind || '--'}m/s`} icon="💨" />
+                      </>
+                    )}
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-slate-700/30 rounded-lg">
+                    <div className="text-xs text-slate-400 mb-1">数据质量</div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-slate-600 rounded-full h-2">
+                        <div className="bg-green-400 h-2 rounded-full transition-all duration-500" style={{ 
+                          width: `${devicesState[openKey]?.dataQuality || 90}%` 
+                        }}></div>
+                      </div>
+                      <span className="text-xs text-green-400 font-medium">
+                        {devicesState[openKey]?.dataQuality || 90}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 text-center">
+                  <div className="text-slate-400 text-sm">
+                    <div className="text-2xl mb-2">📊</div>
+                    <div>点击已完成的传感器查看详细数据</div>
+                    <div className="text-xs mt-1 text-slate-500">拖拽传感器到地球上开始数据采集</div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-4">
               <div className="text-xs text-slate-400 mb-2">雷达传输速度：x1.0</div>
@@ -179,57 +348,7 @@ export default function StageOne({ onComplete, isPaused, isAutoPlay = true, spee
             )}
           </div>
           
-          {/* 详细数据显示区域 */}
-          {openKey && devicesState[openKey]?.status === 'done' && (() => {
-            console.log('Showing data for:', openKey, 'data:', devicesState[openKey]?.data);
-            return true;
-          })() && (
-            <div className="mt-4 rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className={`p-2 rounded-lg ${openKey === 'satellite' ? 'bg-blue-500/20' : openKey === 'ground' ? 'bg-green-500/20' : openKey === 'radar' ? 'bg-orange-500/20' : 'bg-purple-500/20'}`}>
-                    {(() => {
-                      const icons = {
-                        satellite: <FaSatellite className="text-blue-400" size={16} />,
-                        ground: <MdHome className="text-green-400" size={16} />,
-                        radar: <MdRadar className="text-orange-400" size={16} />,
-                        buoy: <FaShip className="text-purple-400" size={16} />
-                      }
-                      return icons[openKey]
-                    })()}
-                  </div>
-                  <span className="text-sky-300 font-semibold">
-                    {openKey === 'satellite' ? '卫星' : openKey === 'ground' ? '地面站' : openKey === 'radar' ? '雷达' : '浮标'}数据详情
-                  </span>
-                </div>
-                <button 
-                  onClick={() => setOpenKey(null)}
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <DetailDataItem label="温度" value={`${devicesState[openKey].data?.temperatureC || '--'}°C`} icon="🌡️" />
-                <DetailDataItem label="湿度" value={`${devicesState[openKey].data?.humidityPct || '--'}%`} icon="💧" />
-                <DetailDataItem label="气压" value={`${devicesState[openKey].data?.pressureHpa || '--'}hPa`} icon="📊" />
-                <DetailDataItem label="风速" value={`${devicesState[openKey].data?.windSpeed || '--'}m/s`} icon="🌪️" />
-                <DetailDataItem label="风向" value={devicesState[openKey].data?.windDir || '--'} icon="🧭" />
-                <DetailDataItem label="云量" value={`${devicesState[openKey].data?.cloudPct || '--'}%`} icon="☁️" />
-              </div>
-              
-              <div className="mt-3 p-3 bg-slate-700/30 rounded-lg">
-                <div className="text-xs text-slate-400 mb-1">数据质量</div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-slate-600 rounded-full h-2">
-                    <div className="bg-green-400 h-2 rounded-full transition-all duration-500" style={{ width: '87%' }}></div>
-                  </div>
-                  <span className="text-xs text-green-400 font-medium">87%</span>
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
     </section>
@@ -454,6 +573,18 @@ function StageOneGlobe({ markers, onDropDevice, onHoverDevice, dragOrigin, hover
       
       {/* 2D传感器标记层 */}
       <div className="absolute inset-0 pointer-events-none">
+        {/* 预设位置标记 */}
+        <PresetMarkers presetMarkers={Object.entries(PRESET_POSITIONS).map(([key, position]) => ({
+          id: `preset-${key}`,
+          x: position.x,
+          y: position.y,
+          key: key,
+          isPreset: true,
+          name: position.name,
+          description: position.description,
+          isOccupied: devicesState[key]?.status !== 'idle'
+        }))} />
+        {/* 实际传感器标记 */}
         <Markers2D markers={markers} devicesState={devicesState} />
       </div>
       
@@ -487,9 +618,9 @@ function StageOneGlobe({ markers, onDropDevice, onHoverDevice, dragOrigin, hover
       
 
       
-      {/* 将右侧传感器到地球提示 */}
+      {/* 拖拽提示 */}
       <div className="absolute bottom-3 right-3 text-xs text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded px-2 py-1">
-        将右侧传感器拖到地球开始采集
+        拖拽传感器到对应的虚线位置
       </div>
     </div>
   )
@@ -664,16 +795,17 @@ function Earth3DCore({ isPaused, markers = [] }) {
     })
   }, [cloudsMap])
   
-  useFrame((_, delta) => {
-    if (!isPaused) {
-      if (earthRef.current) {
-        earthRef.current.rotation.y += delta * 0.05
-      }
-      if (cloudsRef.current) {
-        cloudsRef.current.rotation.y += delta * 0.08
-      }
-    }
-  })
+  // 移除地球自动旋转，保持固定相机视角
+  // useFrame((_, delta) => {
+  //   if (!isPaused) {
+  //     if (earthRef.current) {
+  //       earthRef.current.rotation.y += delta * 0.05
+  //     }
+  //     if (cloudsRef.current) {
+  //       cloudsRef.current.rotation.y += delta * 0.08
+  //     }
+  //   }
+  // })
   
   return (
     <group>
@@ -1054,7 +1186,14 @@ function EarthControls({ onDropDevice, containerRef, setDragPreview }) {
   }, [gl, camera, scene, onDropDevice])
   
   return (
-    <OrbitControls enablePan={false} maxDistance={4} minDistance={2} />
+    <OrbitControls 
+      enablePan={false} 
+      enableRotate={false} 
+      enableZoom={false}
+      maxDistance={3} 
+      minDistance={3}
+      target={[0, 0, 0]}
+    />
   )
 }
 
@@ -1069,6 +1208,14 @@ function TextureStatus() {
 function mergeMetric(state, key, format, allowEmpty = false) {
   const values = Object.values(state).map((s) => s.data?.[key]).filter((v) => v !== undefined && v !== null)
   if (!values.length) return allowEmpty ? format(undefined) : '—'
+  
+  // 处理不同数据类型
+  if (values.some(v => typeof v === 'string')) {
+    // 字符串类型（如风向）返回最后一个值
+    return format(values[values.length - 1])
+  }
+  
+  // 数值类型计算平均值
   const avg = Math.round(values.reduce((a, b) => a + Number(b), 0) / values.length)
   return format(avg)
 }
@@ -1156,7 +1303,7 @@ function Metric({ label, value }) {
 function Markers2D({ markers, devicesState }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="relative w-[85%] max-w-[480px] aspect-square">
+      <div className="relative w-[90%] max-w-[520px] aspect-square">
         {markers.map((m) => (
           <Marker2D key={m.id} marker={m} devicesState={devicesState} />
         ))}
@@ -1181,19 +1328,20 @@ function Marker2D({ marker, devicesState }) {
     return () => clearInterval(interval)
   }, [])
   
-  // 转换3D坐标到2D屏幕位置
-  const worldPos = new THREE.Vector3(
-    (marker.x - 50) / 30,
-    -(marker.y - 50) / 30,
-    Math.sqrt(Math.max(0, 1 - Math.pow((marker.x - 50) / 30, 2) - Math.pow((marker.y - 50) / 30, 2)))
-  ).normalize()
+  // 根据传感器类型设定位置（卫星在轨道上，其他在地面）
+  let x, y, z = 1.0
   
-  const centerX = 50
-  const centerY = 50
-  const projectionScale = 35
-  
-  const x = centerX + worldPos.x * projectionScale
-  const y = centerY - worldPos.y * projectionScale
+  if (marker.isOrbital) {
+    // 卫星在轨道上，相对离地球表面较远
+    x = marker.x
+    y = marker.y
+    z = 1.3 // 轨道高度
+  } else {
+    // 其他传感器在地球表面
+    x = marker.x
+    y = marker.y
+    z = 1.0
+  }
   
   // 获取传感器类型和状态
   const sensorType = marker.key // marker对象使用key字段
@@ -1233,45 +1381,38 @@ function Marker2D({ marker, devicesState }) {
   
   const pulseScale = 1 + Math.sin(pulsePhase) * 0.3
   
-  // 特定传感器的动画效果
+  // 统一闪烁动画效果
   const getIconAnimation = (type) => {
     if (!isActive) return isAnimating ? 'animate-bounce' : ''
     
-    // 采集中使用更强烈的动画，完成后使用温和的动画
-    const intensity = sensorStatus === 'collecting' ? 'fast' : 'normal'
-    
-    switch(type) {
-      case 'satellite':
-        return intensity === 'fast' ? 'animate-pulse' : 'animate-pulse' // 卫星发送信号脉冲
-      case 'ground':
-        return intensity === 'fast' ? 'animate-pulse' : 'animate-pulse' // 地面站接收信号脉冲
-      case 'radar':
-        return 'animate-spin' // 雷达旋转
-      case 'buoy':
-        return '' // 浮标有自定义浮动动画
-      default:
-        return 'animate-pulse'
-    }
+    // 所有传感器都使用统一的闪烁效果
+    return 'animate-pulse'
   }
   
   return (
     <div
-      className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isCompleted ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'}`}
       style={{ 
         left: `${x}%`, 
         top: `${y}%`,
-        zIndex: 10
+        zIndex: marker.isOrbital ? 15 : 10, // 卫星层级更高
+        transform: marker.isOrbital ? 'translate(-50%, -50%) scale(1.2)' : 'translate(-50%, -50%)' // 卫星显示更大
+      }}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (isCompleted) {
+          window.dispatchEvent(new CustomEvent('openSensorData', { detail: { sensorType } }))
+        }
       }}
     >
       {/* 主体图标 */}
-      <div 
-        className={`relative text-2xl ${getIconAnimation(sensorType)}`}
-        style={{
-          // 浮标特殊浮动动画
-          transform: sensorType === 'buoy' && isActive ? 
-            `translateY(${Math.sin(pulsePhase * 2) * 3}px)` : 'none'
-        }}
-      >
+              <div 
+          className={`relative text-2xl ${getIconAnimation(sensorType)}`}
+          style={{
+            // 移除特殊动画，统一使用闪烁效果
+            transform: 'none'
+          }}
+        >
         <div className="flex items-center justify-center">
           {(() => {
             const IconComponent = getMarkerIcon(sensorType)
@@ -1286,244 +1427,98 @@ function Marker2D({ marker, devicesState }) {
           })()}
         </div>
         
-        {/* 基础脉冲圈 */}
-        <div 
-          className={`absolute inset-0 rounded-full border-2 ${getMarkerColor(sensorType)} -z-10 ${sensorStatus === 'collecting' ? 'animate-ping' : ''}`}
-          style={{
-            width: '40px',
-            height: '40px',
-            left: '50%',
-            top: '50%',
-            transform: `translate(-50%, -50%) scale(${isActive ? pulseScale : 1})`,
-            opacity: sensorStatus === 'collecting' ? 0.8 : 0.6
-          }}
-        ></div>
+
         
-        {/* 传感器特效 */}
-        {sensorType === 'radar' && isActive && (
+        {/* 简化闪烁辐射效果 */}
+        {isActive && (
           <>
-            {/* 雷达扫描圈 - 辐射效果 */}
+            {/* 内层闪烁圈 */}
             <div 
-              className="absolute rounded-full border-2 border-orange-300/80 animate-spin"
-              style={{
-                width: '60px',
-                height: '60px',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                borderTopColor: 'transparent',
-                borderRightColor: 'transparent',
-                animationDuration: '2s'
-              }}
-            ></div>
-            {/* 外层辐射圈 */}
-            <div 
-              className="absolute rounded-full border border-orange-300/50"
-              style={{
-                width: '80px',
-                height: '80px',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
-              }}
-            ></div>
-            {/* 最外层辐射圈 */}
-            <div 
-              className="absolute rounded-full border border-orange-300/30"
-              style={{
-                width: '100px',
-                height: '100px',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animation: 'ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite'
-              }}
-            ></div>
-          </>
-        )}
-        
-        {sensorType === 'satellite' && isActive && (
-          <>
-            {/* 卫星信号发送圈 */}
-            <div className="absolute rounded-full border-2 border-blue-300/80 animate-ping"
+              className={`absolute rounded-full border-2 ${getMarkerColor(sensorType).split(' ')[0]} animate-pulse`}
               style={{
                 width: '50px',
                 height: '50px',
                 left: '50%',
                 top: '50%',
                 transform: 'translate(-50%, -50%)',
-                animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite'
+                opacity: 0.8 + Math.sin(pulsePhase * 2) * 0.2
               }}
             ></div>
-            {/* 信号传播圈 */}
-            <div className="absolute rounded-full border border-blue-300/60 animate-ping"
+            
+            {/* 中层辐射圈 */}
+            <div 
+              className={`absolute rounded-full border ${getMarkerColor(sensorType).split(' ')[0]}`}
               style={{
                 width: '70px',
                 height: '70px',
                 left: '50%',
                 top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animationDelay: '0.3s',
-                animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite'
+                transform: `translate(-50%, -50%) scale(${1 + Math.sin(pulsePhase * 1.5) * 0.3})`,
+                opacity: 0.6 - Math.sin(pulsePhase * 1.5) * 0.2
               }}
             ></div>
-            {/* 外层信号圈 */}
-            <div className="absolute rounded-full border border-blue-300/40 animate-ping"
+            
+            {/* 外层辐射圈 */}
+            <div 
+              className={`absolute rounded-full border ${getMarkerColor(sensorType).split(' ')[0]}`}
               style={{
                 width: '90px',
                 height: '90px',
                 left: '50%',
                 top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animationDelay: '0.6s',
-                animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite'
+                transform: `translate(-50%, -50%) scale(${1 + Math.sin(pulsePhase + 1) * 0.4})`,
+                opacity: 0.4 - Math.sin(pulsePhase + 1) * 0.2
               }}
             ></div>
-            {/* 数据流动效果 */}
+            
+            {/* 闪烁中心点 */}
+            <div 
+              className={`absolute rounded-full ${getMarkerColor(sensorType)}`}
+              style={{
+                width: '8px',
+                height: '8px',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                opacity: 0.9 + Math.sin(pulsePhase * 4) * 0.1,
+                boxShadow: `0 0 10px ${getIconColor(sensorType)}80`
+              }}
+            ></div>
+          </>
+        )}
+        
+                  {/* 统一数据传输线 */}
+        {isActive && (
+          <>
             <div 
               className="absolute"
               style={{
                 width: '2px',
-                height: '30px',
+                height: marker.isOrbital ? '100px' : '60px', // 卫星传输线更长
                 left: '50%',
-                top: '100%',
-                background: 'linear-gradient(to bottom, #60a5fa, transparent)',
-                transform: 'translateX(-50%)',
-                opacity: 0.7 + Math.sin(pulsePhase * 4) * 0.3
-              }}
-            ></div>
-          </>
-        )}
-        
-        {sensorType === 'buoy' && isActive && (
-          <>
-            {/* 浮标水波纹 - 模拟海浪 */}
-            <div className="absolute rounded-full border-2 border-purple-300/70"
-              style={{
-                width: '50px',
-                height: '50px',
-                left: '50%',
-                top: '50%',
-                transform: `translate(-50%, -50%) scale(${Math.sin(pulsePhase * 1.5) * 0.3 + 1})`,
-                opacity: 0.8 - Math.sin(pulsePhase * 1.5) * 0.3
-              }}
-            ></div>
-            {/* 第二层波纹 */}
-            <div className="absolute rounded-full border border-purple-300/50"
-              style={{
-                width: '70px',
-                height: '70px',
-                left: '50%',
-                top: '50%',
-                transform: `translate(-50%, -50%) scale(${Math.sin(pulsePhase * 1.2 + 1) * 0.4 + 1})`,
-                opacity: 0.6 - Math.sin(pulsePhase * 1.2) * 0.2
-              }}
-            ></div>
-            {/* 第三层波纹 */}
-            <div className="absolute rounded-full border border-purple-300/30"
-              style={{
-                width: '90px',
-                height: '90px',
-                left: '50%',
-                top: '50%',
-                transform: `translate(-50%, -50%) scale(${Math.sin(pulsePhase * 0.8 + 2) * 0.5 + 1})`,
-                opacity: 0.4 - Math.sin(pulsePhase * 0.8) * 0.15
-              }}
-            ></div>
-            {/* 浮标锚链效果 */}
-            <div 
-              className="absolute border-l border-purple-300/40"
-              style={{
-                width: '0px',
-                height: '25px',
-                left: '50%',
-                top: '100%',
-                transform: 'translateX(-50%)',
-                borderStyle: 'dashed'
-              }}
-            ></div>
-          </>
-        )}
-        
-        {sensorType === 'ground' && isActive && (
-          <>
-            {/* 地面站接收信号脉冲 */}
-            <div className="absolute rounded-full border-2 border-green-300/80"
-              style={{
-                width: '45px',
-                height: '45px',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animation: 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-              }}
-            ></div>
-            {/* 信号接收圈 */}
-            <div className="absolute rounded-full border border-green-300/60 animate-ping"
-              style={{
-                width: '65px',
-                height: '65px',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animation: 'ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite'
-              }}
-            ></div>
-            {/* 外层接收圈 */}
-            <div className="absolute rounded-full border border-green-300/40 animate-ping"
-              style={{
-                width: '85px',
-                height: '85px',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                animationDelay: '0.4s',
-                animation: 'ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite'
-              }}
-            ></div>
-            {/* 天线指向效果 */}
-            <div 
-              className="absolute bg-green-300/60"
-              style={{
-                width: '2px',
-                height: '20px',
-                left: '50%',
-                top: '-20px',
+                top: marker.isOrbital ? '-100px' : '100%', // 卫星向上传输，其他向下
+                background: `linear-gradient(${marker.isOrbital ? 'to top' : 'to bottom'}, ${getIconColor(sensorType)}, transparent)`,
                 transform: 'translateX(-50%)',
                 opacity: 0.6 + Math.sin(pulsePhase * 3) * 0.4
               }}
             ></div>
-            {/* 数据接收指示 */}
-            <div 
-              className="absolute"
-              style={{
-                width: '1px',
-                height: '15px',
-                left: '50%',
-                top: '-10px',
-                background: 'linear-gradient(to top, transparent, #86efac)',
-                transform: 'translateX(-50%)',
-                opacity: 0.5 + Math.sin(pulsePhase * 5) * 0.3
-              }}
-            ></div>
+            
+            {/* 卫星轨道指示 */}
+            {marker.isOrbital && (
+              <div 
+                className="absolute rounded-full border border-blue-300/30"
+                style={{
+                  width: '160px',
+                  height: '160px',
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  borderStyle: 'dashed',
+                  opacity: 0.3 + Math.sin(pulsePhase * 0.5) * 0.2
+                }}
+              ></div>
+            )}
           </>
-        )}
-        
-        {/* 数据传输线 */}
-        {isActive && (
-          <div 
-            className="absolute bg-gradient-to-t from-transparent via-white/20 to-transparent"
-            style={{
-              width: '2px',
-              height: '100px',
-              left: '50%',
-              top: '100%',
-              transformOrigin: 'top',
-              transform: 'translateX(-50%)',
-              opacity: 0.4 + Math.sin(pulsePhase * 3) * 0.3
-            }}
-          ></div>
         )}
       </div>
     </div>

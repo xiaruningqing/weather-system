@@ -54,10 +54,9 @@ export default function SensorCard({
 	const isDone = status === 'done'
 
 	return (
-		<button
-			type="button"
+		<div
+			className={`w-full text-left rounded-lg border ${t.border} ${t.glow} bg-[#0D1B2A]/60 p-3 transition-colors duration-200 hover:border-opacity-90 hover:brightness-110 cursor-pointer ${className}`}
 			onClick={() => onClick?.(id)}
-			className={`w-full text-left rounded-lg border ${t.border} ${t.glow} bg-[#0D1B2A]/60 p-3 transition-colors duration-200 hover:border-opacity-90 hover:brightness-110 ${className}`}
 		>
 			<div className="flex items-center justify-between gap-2">
 				{/* 左：圆形图标底 */}
@@ -81,7 +80,7 @@ export default function SensorCard({
 					{isDone ? '完成' : status === 'collecting' ? '采集中' : '待采集'}
 				</button>
 			</div>
-		</button>
+		</div>
 	)
 }
 
